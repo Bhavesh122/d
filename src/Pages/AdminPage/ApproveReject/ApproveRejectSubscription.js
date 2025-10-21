@@ -79,6 +79,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Finance",
                 date: "15/01/2025",
                 status: "Pending",
+                requestReason: "I need access to financial reports for quarterly analysis and forecasting purposes."
             },
             {
                 id: 2,
@@ -87,6 +88,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Investment",
                 date: "12/01/2025",
                 status: "Pending",
+                requestReason: "Required for investment portfolio management and client reporting."
             },
             {
                 id: 3,
@@ -95,6 +97,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Finance",
                 date: "14/01/2025",
                 status: "Pending",
+                requestReason: "Need to review budget allocations and expense tracking for the finance team."
             },
         ];
 
@@ -230,6 +233,22 @@ const ApproveRejectSubscription = () => {
                             {!sub.departmentMatch && sub.status === 'Pending' && (
                                 <div className="ar-warning">
                                     ⚠️ Department mismatch detected
+                                </div>
+                            )}
+                            
+                            {sub.requestReason && (
+                                <div className="ar-request-reason" style={{
+                                    marginTop: '15px',
+                                    padding: '12px',
+                                    backgroundColor: '#f8f9fa',
+                                    borderLeft: '4px solid #007bff',
+                                    borderRadius: '4px'
+                                }}>
+                                    <strong style={{ color: '#007bff' }}>
+                                        <i className="bi bi-chat-left-text me-2"></i>
+                                        Request Reason:
+                                    </strong>
+                                    <p style={{ margin: '8px 0 0 0', color: '#555' }}>{sub.requestReason}</p>
                                 </div>
                             )}
                             

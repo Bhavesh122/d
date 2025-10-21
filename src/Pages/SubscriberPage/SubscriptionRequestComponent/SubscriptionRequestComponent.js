@@ -3,10 +3,13 @@ import './SubscriptionRequest.css';
 const SubscriptionRequestComponent = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
+    const [showRequestModal, setShowRequestModal] = useState(false);
+    const [requestingDomain, setRequestingDomain] = useState(null);
+    const [requestReason, setRequestReason] = useState('');
 
     // Domain catalog instead of individual files/reports
     const [domains, setDomains] = useState([
-        { id: 1, name: 'Finance', description: 'Financial statements, P&L, balance sheets, forecasting models', status: null },
+        { id: 1, name: 'Finance', description: 'Financial statements, P&L, balance sheets, forecasting', status: null },
         { id: 2, name: 'Risk Management', description: 'Risk exposure, VaR, stress testing, compliance reporting', status: null },
         { id: 3, name: 'Trading', description: 'Trade blotter, positions, performance analytics, market data', status: null },
         { id: 4, name: 'HR Analytics', description: 'Workforce metrics, hiring funnel, retention and engagement', status: null },
@@ -20,21 +23,45 @@ const SubscriptionRequestComponent = () => {
         return (filterStatus === 'all' || d.status === filterStatus) && match;
     });
 
-    const handleRequest = (id) => setDomains(domains.map(d => d.id === id && !d.status ? { ...d, status: 'requested' } : d));
-    const handleCancel = (id) => setDomains(domains.map(d => d.id === id && d.status === 'requested' ? { ...d, status: null } : d));
+    const handleRequest = (domain) => {
+        setRequestingDomain(domain);
+        setRequestReason('');
+        setShowRequestModal(true);
+    };
+
+    const handleSubmitRequest = () => {
+        if (!requestReason.trim()) {
+            alert('Please provide a reason for requesting access');
+            return;
+        }
+        setDomains(domains.map(d => 
+            d.id === requestingDomain.id && !d.status 
+                ? { ...d, status: 'requested', requestReason } 
+                : d
+        ));
+        setShowRequestModal(false);
+        setRequestingDomain(null);
+        setRequestReason('');
+    };
+
+    const handleCancel = (id) => setDomains(domains.map(d => d.id === id && d.status === 'requested' ? { ...d, status: null, requestReason: '' } : d));
     const getCount = (status) => domains.filter(d => d.status === status).length;
 
     return (
         <div className="subscription-container">
             {/* Hero Section */}
-            <div className="hero-section text-center mb-5">
-                <div className="hero-icon mb-3">
-                    <i className="bi bi-folder-check"></i>
+            <div className="hero-section mb-5">
+                <div className="d-flex align-items-center mb-3">
+                    <div className="hero-icon me-3">
+                        <i className="bi bi-folder-check"></i>
+                    </div>
+                    <div>
+                        <h1 className="hero-title mb-2">Domain Subscription Center</h1>
+                        <p className="hero-subtitle mb-0">
+                            Browse and request access to business domains like Finance, Risk Management, Trading, and HR Analytics
+                        </p>
+                    </div>
                 </div>
-                <h1 className="hero-title mb-3">Domain Subscription Center</h1>
-                <p className="hero-subtitle mb-4">
-                    Browse and request access to business domains like Finance, Risk Management, Trading, and HR Analytics
-                </p>
             </div>
 
             {/* Search & Filter Section */}
@@ -113,8 +140,7 @@ const SubscriptionRequestComponent = () => {
                                             <i className="bi bi-folder-fill"></i>
                                         </div>
                                         <div className="flex-grow-1">
-                                            <h5 className="domain-name mb-2">{d.name}</h5>
-                                            <p className="domain-description text-muted mb-0">{d.description}</p>
+                                            <h5 className="domain-name mb-0">{d.name}</h5>
                                         </div>
                                         {d.status && (
                                             <span className={`status-badge badge ${d.status === 'approved' ? 'bg-success' : 'bg-warning text-dark'}`}>
@@ -129,8 +155,8 @@ const SubscriptionRequestComponent = () => {
                                     
                                     <div className="domain-meta mb-3">
                                         <span className="meta-item">
-                                            <i className="bi bi-tag me-1"></i>
-                                            Domain: {d.name}
+                                            <i className="bi bi-info-circle me-1"></i>
+                                            Description: {d.description}
                                         </span>
                                     </div>
 
@@ -156,7 +182,7 @@ const SubscriptionRequestComponent = () => {
                                         ) : (
                                             <button
                                                 className="btn btn-gradient w-100"
-                                                onClick={() => handleRequest(d.id)}
+                                                onClick={() => handleRequest(d)}
                                             >
                                                 <i className="bi bi-box-arrow-in-right me-2"></i>
                                                 Request Access
@@ -167,6 +193,79 @@ const SubscriptionRequestComponent = () => {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Request Access Modal */}
+            {showRequestModal && requestingDomain && (
+                <div className="modal-backdrop" onClick={() => setShowRequestModal(false)} style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1050
+                }}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+                        backgroundColor: 'white',
+                        borderRadius: '8px',
+                        padding: '30px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ marginBottom: '20px', color: '#333' }}>
+                            <i className="bi bi-box-arrow-in-right me-2"></i>
+                            Request Access to {requestingDomain.name}
+                        </h3>
+                        <div style={{ marginBottom: '20px' }}>
+                            <p style={{ color: '#666', marginBottom: '15px' }}>
+                                <strong>Domain:</strong> {requestingDomain.name}
+                            </p>
+                            <p style={{ color: '#666', marginBottom: '15px' }}>
+                                <strong>Description:</strong> {requestingDomain.description}
+                            </p>
+                        </div>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
+                                Reason for Request <span style={{ color: 'red' }}>*</span>
+                            </label>
+                            <textarea
+                                className="form-control"
+                                rows="4"
+                                placeholder="Please explain why you need access to this domain..."
+                                value={requestReason}
+                                onChange={(e) => setRequestReason(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    fontSize: '14px'
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setShowRequestModal(false)}
+                                style={{ padding: '8px 20px' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleSubmitRequest}
+                                style={{ padding: '8px 20px' }}
+                            >
+                                Submit Request
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

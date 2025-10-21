@@ -11,14 +11,15 @@ const DownloadReportComponent = () => {
     const [filterCategory, setFilterCategory] = useState('all');
     const [selectedReport, setSelectedReport] = useState(null);
     const [selectedFile,setSelectedFile] = useState(null);
+    const [showFavorites, setShowFavorites] = useState(false);
 
     const [reports, setReports] = useState([
-        { id: 1, fileName: 'Q4_2024_Financial_Report', title: 'Q4 2024 Financial Report', description: 'Comprehensive quarterly financial statements, P&L analysis, and balance sheet review', domain: 'Finance', formats: ['pdf', 'xlsx', 'csv'], size: { pdf: '2.4 MB', xlsx: '1.8 MB', csv: '950 KB' }, publishedDate: '15 Dec 2024', downloads: 145, version: 'v1.2', recommendedFormat: 'pdf' },
-        { id: 2, fileName: 'Risk_Exposure_Summary', title: 'Risk Exposure Summary', description: 'Value at Risk (VaR), stress testing results, and compliance reporting metrics', domain: 'Risk Management', formats: ['xlsx', 'csv', 'pdf'], size: { pdf: '1.2 MB', xlsx: '856 KB', csv: '420 KB' }, publishedDate: '18 Dec 2024', downloads: 98, version: 'v2.0', recommendedFormat: 'xlsx' },
-        { id: 3, fileName: 'Trading_Performance_Report', title: 'Trading Performance Report', description: 'Trade blotter analysis, position tracking, and performance analytics dashboard', domain: 'Trading', formats: ['pdf', 'xlsx'], size: { pdf: '3.1 MB', xlsx: '2.2 MB' }, publishedDate: '10 Dec 2024', downloads: 203, version: 'v1.0', recommendedFormat: 'pdf' },
-        { id: 4, fileName: 'HR_Analytics_Monthly', title: 'HR Analytics Monthly', description: 'Workforce metrics, hiring funnel analysis, retention and employee engagement data', domain: 'HR Analytics', formats: ['pdf', 'xlsx'], size: { pdf: '1.9 MB', xlsx: '1.4 MB' }, publishedDate: '20 Dec 2024', downloads: 167, version: 'v1.1', recommendedFormat: 'pdf' },
-        { id: 5, fileName: 'Operations_KPI_Dashboard', title: 'Operations KPI Dashboard', description: 'Process efficiency metrics, throughput analysis, SLA compliance, and incident tracking', domain: 'Operations', formats: ['pdf', 'csv', 'xlsx'], size: { pdf: '2.8 MB', xlsx: '2.1 MB', csv: '1.1 MB' }, publishedDate: '22 Dec 2024', downloads: 89, version: 'v2.1', recommendedFormat: 'pdf' },
-        { id: 6, fileName: 'Compliance_Audit_Report', title: 'Compliance Audit Report', description: 'Audit trails, policy adherence tracking, and regulatory submission documentation', domain: 'Compliance', formats: ['pdf', 'xlsx'], size: { pdf: '2.2 MB', xlsx: '1.6 MB' }, publishedDate: '12 Dec 2024', downloads: 134, version: 'v1.0', recommendedFormat: 'pdf' }
+        { id: 1, fileName: 'Q4_2024_Financial_Report', title: 'Q4 2024 Financial Report', description: 'Comprehensive quarterly financial statements, P&L analysis, and balance sheet review', domain: 'Finance', formats: ['pdf', 'xlsx', 'csv'], size: { pdf: '2.4 MB', xlsx: '1.8 MB', csv: '950 KB' }, publishedDate: '15 Dec 2024', downloads: 145, version: 'v1.2', recommendedFormat: 'pdf', favorite: false },
+        { id: 2, fileName: 'Risk_Exposure_Summary', title: 'Risk Exposure Summary', description: 'Value at Risk (VaR), stress testing results, and compliance reporting metrics', domain: 'Risk Management', formats: ['xlsx', 'csv', 'pdf'], size: { pdf: '1.2 MB', xlsx: '856 KB', csv: '420 KB' }, publishedDate: '18 Dec 2024', downloads: 98, version: 'v2.0', recommendedFormat: 'xlsx', favorite: false },
+        { id: 3, fileName: 'Trading_Performance_Report', title: 'Trading Performance Report', description: 'Trade blotter analysis, position tracking, and performance analytics dashboard', domain: 'Trading', formats: ['pdf', 'xlsx'], size: { pdf: '3.1 MB', xlsx: '2.2 MB' }, publishedDate: '10 Dec 2024', downloads: 203, version: 'v1.0', recommendedFormat: 'pdf', favorite: false },
+        { id: 4, fileName: 'HR_Analytics_Monthly', title: 'HR Analytics Monthly', description: 'Workforce metrics, hiring funnel analysis, retention and employee engagement data', domain: 'HR Analytics', formats: ['pdf', 'xlsx'], size: { pdf: '1.9 MB', xlsx: '1.4 MB' }, publishedDate: '20 Dec 2024', downloads: 167, version: 'v1.1', recommendedFormat: 'pdf', favorite: false },
+        { id: 5, fileName: 'Operations_KPI_Dashboard', title: 'Operations KPI Dashboard', description: 'Process efficiency metrics, throughput analysis, SLA compliance, and incident tracking', domain: 'Operations', formats: ['pdf', 'csv', 'xlsx'], size: { pdf: '2.8 MB', xlsx: '2.1 MB', csv: '1.1 MB' }, publishedDate: '22 Dec 2024', downloads: 89, version: 'v2.1', recommendedFormat: 'pdf', favorite: false },
+        { id: 6, fileName: 'Compliance_Audit_Report', title: 'Compliance Audit Report', description: 'Audit trails, policy adherence tracking, and regulatory submission documentation', domain: 'Compliance', formats: ['pdf', 'xlsx'], size: { pdf: '2.2 MB', xlsx: '1.6 MB' }, publishedDate: '12 Dec 2024', downloads: 134, version: 'v1.0', recommendedFormat: 'pdf', favorite: false }
     ]);
 
     const domains = ['Finance', 'Risk Management', 'Trading', 'HR Analytics', 'Operations', 'Compliance'];
@@ -26,8 +27,15 @@ const DownloadReportComponent = () => {
     const filteredReports = reports.filter(r => {
         const search = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.domain.toLowerCase().includes(searchQuery.toLowerCase());
         const dom = filterCategory === 'all' || r.domain === filterCategory;
-        return search && dom;
+        const fav = !showFavorites || r.favorite;
+        return search && dom && fav;
     });
+
+    const toggleFavorite = (id) => {
+        setReports(reports.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    };
+
+    const getFavoritesCount = () => reports.filter(r => r.favorite).length;
 
     const handleDownload = (url) => {
         const link = document.createElement("a");
@@ -46,31 +54,45 @@ const DownloadReportComponent = () => {
     return (
         <div className="download-report-container">
             {/* Header Section */}
-            <div className="hero-section text-center mb-5">
-                <div className="hero-icon mb-3">
-                    <i className="bi bi-file-earmark-arrow-down"></i>
+            <div className="hero-section mb-5">
+                <div className="d-flex align-items-center mb-3">
+                    <div className="hero-icon me-3">
+                        <i className="bi bi-file-earmark-arrow-down"></i>
+                    </div>
+                    <div>
+                        <h1 className="hero-title mb-2">Download Reports</h1>
+                        <p className="hero-subtitle mb-0">
+                            Access and download your reports of the respective approved domain
+                        </p>
+                    </div>
                 </div>
-                <h1 className="hero-title mb-3">Download Reports</h1>
-                <p className="hero-subtitle mb-4">
-                    Access and download your approved reports in multiple formats
-                </p>
             </div>
             
             {/* Search and Filter */}
             <div className="search-filter-section card shadow-sm mb-4">
                 <div className="card-body">
-                    <div className="row g-3">
-                        <div className="col-md-6">
+                    <div className="row g-3 align-items-center">
+                        <div className="col-md-5">
                             <div className="search-wrapper">
                                 <i className="bi bi-search search-icon"></i>
                                 <input type="text" className="form-control search-input" placeholder="Search reports..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                             </div>
                         </div>
-                        <div className="col-md-6">
+                        <div className="col-md-5">
                             <select className="form-select filter-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                                 <option value="all">All Domains</option>
                                 {domains.map(dom => <option key={dom} value={dom}>{dom}</option>)}
                             </select>
+                        </div>
+                        <div className="col-md-2">
+                            <button
+                                className={`btn w-100 ${showFavorites ? 'btn-warning' : 'btn-outline-warning'}`}
+                                onClick={() => setShowFavorites(!showFavorites)}
+                            >
+                                <i className="bi bi-star-fill me-2"></i>
+                                Favorites
+                                <span className="badge bg-light text-dark ms-2">{getFavoritesCount()}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -88,7 +110,16 @@ const DownloadReportComponent = () => {
                                             <i className="bi bi-file-earmark-text"></i>
                                         </div>
                                         <div className="flex-grow-1">
-                                            <h4 className="report-card-title mb-2">{r.title}</h4>
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <h4 className="report-card-title mb-0">{r.title}</h4>
+                                                <button
+                                                    className="btn btn-sm btn-link p-0"
+                                                    onClick={() => toggleFavorite(r.id)}
+                                                    style={{ fontSize: '1.5rem', color: r.favorite ? '#ffc107' : '#ccc' }}
+                                                >
+                                                    <i className={`bi bi-star${r.favorite ? '-fill' : ''}`}></i>
+                                                </button>
+                                            </div>
                                             <p className="report-description text-muted mb-3">{r.description}</p>
                                             <div className="report-meta d-flex flex-wrap gap-3 mb-4">
                                                 {[
