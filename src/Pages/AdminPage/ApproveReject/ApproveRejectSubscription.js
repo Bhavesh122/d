@@ -77,6 +77,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Finance",
                 date: "15/01/2025",
                 status: "Pending",
+                requestReason: "I need access to Finance domain to generate quarterly financial reports and analyze budget allocations for my department."
             },
             {
                 id: 2,
@@ -85,6 +86,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Investment",
                 date: "12/01/2025",
                 status: "Pending",
+                requestReason: "Required for managing investment portfolios and tracking asset performance metrics."
             },
             {
                 id: 3,
@@ -93,6 +95,7 @@ const ApproveRejectSubscription = () => {
                 domain: "Finance",
                 date: "14/01/2025",
                 status: "Pending",
+                requestReason: "Need to access financial statements and compliance reports for audit purposes."
             },
         ];
 
@@ -223,6 +226,13 @@ const ApproveRejectSubscription = () => {
                                 </div>
                             </div>
                             
+                            {sub.requestReason && (
+                                <div className="ar-request-reason">
+                                    <strong>Request Reason:</strong>
+                                    <p>{sub.requestReason}</p>
+                                </div>
+                            )}
+                            
                             {!sub.departmentMatch && sub.status === 'Pending' && (
                                 <div className="ar-warning">
                                     ⚠️ Department mismatch detected
@@ -283,6 +293,13 @@ const ApproveRejectSubscription = () => {
                             <p><strong>Requested Domain:</strong> {rejectingSubscription.domain}</p>
                             <p><strong>Actual Department:</strong> {rejectingSubscription.actualDepartment}</p>
                         </div>
+                        
+                        {rejectingSubscription.requestReason && (
+                            <div className="ar-modal-request-reason">
+                                <strong>📝 Subscriber's Request Reason:</strong>
+                                <p>{rejectingSubscription.requestReason}</p>
+                            </div>
+                        )}
                         
                         <div className="ar-modal-form">
                             <label className="ar-modal-label">Reason for Rejection *</label>

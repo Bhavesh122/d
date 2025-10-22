@@ -327,6 +327,29 @@
     gap: 0.5rem;
 }
 
+.ar-request-reason {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border: 2px solid #2196F3;
+    border-radius: 8px;
+    color: #0D47A1;
+    font-size: 0.85rem;
+}
+
+.ar-request-reason strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #1565C0;
+    font-size: 0.9rem;
+}
+
+.ar-request-reason p {
+    margin: 0;
+    line-height: 1.5;
+    color: #1976D2;
+}
+
 .ar-rejection-reason {
     margin-top: 0.75rem;
     padding: 0.75rem;
@@ -406,6 +429,30 @@
 .ar-modal-user-info strong {
     color: #2B73D2;
     font-weight: 600;
+}
+
+.ar-modal-request-reason {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border: 2px solid #2196F3;
+    border-left: 4px solid #1976D2;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.ar-modal-request-reason strong {
+    display: block;
+    color: #1565C0;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.ar-modal-request-reason p {
+    margin: 0;
+    color: #1976D2;
+    line-height: 1.6;
+    font-size: 0.9rem;
 }
 
 .ar-modal-form {
