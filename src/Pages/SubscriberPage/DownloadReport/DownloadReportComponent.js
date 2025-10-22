@@ -3,7 +3,7 @@ import './DownloadReport.css';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 
 import PDFViewer from '../PDFViewer/PDFViewer';
-const PDF_FILE = "http://localhost:3000/Database_Fundamentals.pdf";
+const PDF_FILE = "Database_Fundamentals.pdf";
 
 const DownloadReportComponent = () => {
     const navigate = useNavigate();
