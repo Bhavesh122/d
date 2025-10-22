@@ -5,8 +5,8 @@ import { FilePathManagement } from "../FilePathManagement/FilePathManagement";
 import { UserGroupAccess } from "../UserGroupAccess/UserGroupAccess";
 import './Dashboard.css';
 import AuditLogs from "../AuditLog/AuditLogs";
+import AdminNotification from "../AdminNotification/AdminNotification";
 import { LogOut } from 'lucide-react'
-
 
 export default function Dashboard({ navigate }) {
     const [view, setView] = useState('dashboard');
@@ -117,6 +117,7 @@ export default function Dashboard({ navigate }) {
                     <span className="logo-icon"></span>
                     <div><h2>RW Tool</h2><p>Admin Panel</p></div>
                 </div>
+
                 <div className="side-nav">
                     <p className="nav-label">Management</p>
                     {nav.map((n, i) => (
@@ -130,7 +131,7 @@ export default function Dashboard({ navigate }) {
                 <div className="top">
                     <button onClick={() => setOpen(!open)} className="menu">☰</button>
                     <div className="actions">
-                        <div className="notif"> <span className="dot"></span></div>
+                        <AdminNotification />
                         <button onClick={logout} className="logout-btn">
                             <LogOut style={{ width: 16, height: 16 }} />
                             Logout
@@ -143,4 +144,3 @@ export default function Dashboard({ navigate }) {
         </div>
     );
 }
-

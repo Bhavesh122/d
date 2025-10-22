@@ -1,4 +1,3 @@
-
 .dm-container {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     padding: 0;
@@ -46,41 +45,40 @@
   }
   
   .dm-btn-edit {
-    background: #E3F2FD;
-    color: #0047BB;
-    border: 2px solid #0047BB;
+    padding: 6px 12px;
+    border: none;
     border-radius: 6px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
     cursor: pointer;
-    margin-right: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 8px;
     transition: all 0.2s ease;
+    background: linear-gradient(135deg, #2B73D2 0%, #1E58A7 100%);
+    color: white;
   }
   
   .dm-btn-edit:hover {
-    background: #0047BB;
-    color: white;
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, #1E58A7 0%, #153D73 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(43, 115, 210, 0.2);
   }
   
   .dm-btn-delete {
-    background: white;
-    color: #ef4444;
-    border: 2px solid #ef4444;
+    padding: 6px 12px;
+    border: none;
     border-radius: 6px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
     cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
     transition: all 0.2s ease;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
   }
   
   .dm-btn-delete:hover {
-    background: #ef4444;
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
   }
   
   .dm-btn-cancel {
