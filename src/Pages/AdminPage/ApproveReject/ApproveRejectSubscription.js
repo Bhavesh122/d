@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./ApproveRejectSubscription.css";
 
-// Active Directory Users data
 const AD_USERS = [
   {
     email: "bhavesh@gmail.com",
@@ -54,7 +53,6 @@ const AD_USERS = [
   }
 ];
 
-// Helper function to get user department
 const getUserDepartment = (email) => {
   const user = AD_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
   return user ? user.department : "Unknown";
@@ -98,7 +96,6 @@ const ApproveRejectSubscription = () => {
             },
         ];
 
-        // Get AD department for each user
         const subscriptionsWithAD = dummyData.map((sub) => {
             const department = getUserDepartment(sub.email);
             return {
@@ -122,7 +119,6 @@ const ApproveRejectSubscription = () => {
 
     const openRejectModal = (subscription) => {
         setRejectingSubscription(subscription);
-        // Pre-fill reason if departments don't match
         if (!subscription.departmentMatch) {
             setRejectionReason("Requested domain does not match user's department");
         } else {
@@ -277,7 +273,6 @@ const ApproveRejectSubscription = () => {
                 )}
             </div>
 
-            {/* Rejection Reason Modal */}
             {showRejectModal && rejectingSubscription && (
                 <div className="ar-modal-backdrop" onClick={closeRejectModal}>
                     <div className="ar-modal" onClick={(e) => e.stopPropagation()}>

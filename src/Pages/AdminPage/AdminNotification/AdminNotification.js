@@ -61,7 +61,6 @@ const AdminNotification = () => {
 
   return (
     <div className="admin-notif-container">
-      {/* Bell Icon with Badge */}
       <div className="admin-notif-trigger" onClick={() => setIsOpen(!isOpen)}>
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -69,10 +68,8 @@ const AdminNotification = () => {
         )}
       </div>
 
-      {/* Dropdown Panel */}
       {isOpen && (
         <div className="admin-notif-dropdown">
-          {/* Header */}
           <div className="admin-notif-header">
             <h5 className="admin-notif-title">Notifications</h5>
             {unreadCount > 0 && (
@@ -82,7 +79,6 @@ const AdminNotification = () => {
             )}
           </div>
 
-          {/* Notification List */}
           <div className="admin-notif-list">
             {notifications.length === 0 ? (
               <div className="admin-no-notif">
@@ -121,7 +117,6 @@ const AdminNotification = () => {
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
             <div className="admin-notif-footer">
               <a href="#" className="admin-view-all">View All Activity</a>

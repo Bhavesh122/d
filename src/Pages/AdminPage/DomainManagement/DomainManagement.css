@@ -26,22 +26,22 @@
 
   
   .dm-btn-primary {
-    background: linear-gradient(135deg, #0047BB 0%, #0066FF 100%);
+    background: linear-gradient(135deg, #2B73D2 0%, #58B24C 100%);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 71, 187, 0.2);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(43, 115, 210, 0.2);
   }
   
   .dm-btn-primary:hover {
-    background: linear-gradient(135deg, #003399 0%, #0047BB 100%);
+    background: linear-gradient(135deg, #1E58A7 0%, #3D9639 100%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 71, 187, 0.3);
+    box-shadow: 0 4px 12px rgba(43, 115, 210, 0.3);
   }
   
   .dm-btn-edit {
@@ -98,7 +98,6 @@
     border-color: #cbd5e0;
   }
   
-  /* Search Input */
   .dm-search-input {
     padding: 0.75rem 1rem;
     border-radius: 6px;
@@ -117,7 +116,6 @@
     box-shadow: 0 0 0 3px rgba(0, 71, 187, 0.1);
   }
   
-  /* Table */
   .dm-table {
     width: 100%;
     border-collapse: collapse;
@@ -189,7 +187,6 @@
     }
   }
   
-  /* Modal */
   .dm-modal-backdrop {
     position: fixed;
     top: 0;
@@ -281,7 +278,6 @@
     margin-top: 1.5rem;
   }
   
-  /* Responsive Design */
   @media (max-width: 768px) {
     .dm-header {
       flex-direction: column;

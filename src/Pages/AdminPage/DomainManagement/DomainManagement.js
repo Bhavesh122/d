@@ -115,12 +115,10 @@ export const DomainManagement = () => {
 
   return (
     <div className="dm-container">
-      {/* Notification */}
       {notification && (
         <div className="dm-notification">{notification}</div>
       )}
 
-      {/* Header */}
       <div className="dm-header">
         <h1 className="dm-title">Domain Management</h1>
         <button className="dm-btn-primary" onClick={() => openModal()}>
@@ -128,7 +126,6 @@ export const DomainManagement = () => {
         </button>
       </div>
 
-      {/* Search */}
       <input
         type="text"
         placeholder="Search domains..."
@@ -137,7 +134,6 @@ export const DomainManagement = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
       />
 
-      {/* Table */}
       <table className="dm-table">
         <thead>
           <tr>
@@ -180,7 +176,6 @@ export const DomainManagement = () => {
         </tbody>
       </table>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="dm-modal-backdrop" onClick={closeModal}>
           <div className="dm-modal" onClick={(e) => e.stopPropagation()}>
@@ -219,7 +214,6 @@ export const DomainManagement = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="dm-modal-backdrop" onClick={closeDeleteConfirm}>
           <div className="dm-modal" onClick={(e) => e.stopPropagation()}>

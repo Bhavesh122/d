@@ -152,12 +152,10 @@ export const FilePathManagement = () => {
 
   return (
     <div className="fpm-container">
-      {/* Notification */}
       {notification && (
         <div className="fpm-notification">{notification}</div>
       )}
 
-      {/* Header */}
       <div className="fpm-header">
         <div>
           <h1 className="fpm-title">File Path Management</h1>
@@ -168,7 +166,6 @@ export const FilePathManagement = () => {
         </button>
       </div>
 
-      {/* Search */}
       <input
         type="text"
         placeholder="Search by report name or path..."
@@ -177,7 +174,6 @@ export const FilePathManagement = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
       />
 
-      {/* Table */}
       <table className="fpm-table">
         <thead>
           <tr>
@@ -231,7 +227,6 @@ export const FilePathManagement = () => {
         </tbody>
       </table>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fpm-modal-backdrop" onClick={closeModal}>
           <div className="fpm-modal" onClick={(e) => e.stopPropagation()}>
@@ -288,7 +283,6 @@ export const FilePathManagement = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fpm-modal-backdrop" onClick={closeDeleteConfirm}>
           <div className="fpm-modal" onClick={(e) => e.stopPropagation()}>

@@ -3,7 +3,6 @@
   max-width: 100%;
 }
 
-/* Notification */
 .fpm-notification {
   position: fixed;
   top: 20px;
@@ -29,7 +28,6 @@
   }
 }
 
-/* Header */
 .fpm-header {
   display: flex;
   justify-content: space-between;
@@ -74,7 +72,6 @@
   box-shadow: 0 4px 12px rgba(43, 115, 210, 0.3);
 }
 
-/* Search */
 .fpm-search-input {
   width: 100%;
   padding: 12px 16px;
@@ -91,7 +88,6 @@
   box-shadow: 0 0 0 3px rgba(43, 115, 210, 0.1);
 }
 
-/* Table */
 .fpm-table {
   width: 100%;
   border-collapse: collapse;
@@ -152,7 +148,6 @@
   padding: 32px !important;
 }
 
-/* Status Badge */
 .fpm-badge {
   padding: 4px 12px;
   border-radius: 12px;
@@ -181,7 +176,6 @@
   transform: scale(1.05);
 }
 
-/* Action Buttons */
 .fpm-btn-edit,
 .fpm-btn-delete {
   padding: 6px 12px;
@@ -216,7 +210,6 @@
   box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
 }
 
-/* Modal */
 .fpm-modal-backdrop {
   position: fixed;
   top: 0;
@@ -316,7 +309,6 @@
   transform: translateY(-2px);
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
   .fpm-header {
     flex-direction: column;
