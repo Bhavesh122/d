@@ -431,10 +431,10 @@ tbody tr:hover .badge {
 /* Logout Button */
 .logout-btn {
     padding: 8px 16px;
-    background: linear-gradient(135deg, #2B73D2 0%, #58B24C 100%);
+    background: #dc2626;
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 600;
@@ -442,13 +442,13 @@ tbody tr:hover .badge {
     display: flex;
     align-items: center;
     gap: 6px;
-    box-shadow: 0 2px 8px rgba(43, 115, 210, 0.2);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
 }
 
 .logout-btn:hover {
-    background: linear-gradient(135deg, #1E58A7 0%, #3D9639 100%);
+    background: #b91c1c;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(43, 115, 210, 0.3);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
 }
 
 /* Responsive Design */
