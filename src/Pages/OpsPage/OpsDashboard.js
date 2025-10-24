@@ -1,5 +1,3 @@
-
-
 // import React, { useState } from 'react';
 // import {
 //     LogOut,
@@ -413,6 +411,7 @@ import {
     Activity,
     PlusCircle,
     Bell,
+    X,
     Search,
     Star,
     Clock,
@@ -653,6 +652,22 @@ const OpsDashboard = ({ navigate }) => {
         { id: 'n2', title: 'Risk_Assessment_2024.xlsx published', reportId: 'r2', time: '10m ago', unread: false },
     ]);
 
+    // Notification helpers (Admin-style UI, renamed to .notification-*)
+    const unreadCount = notifications.filter((n) => n.unread).length;
+
+    const markAsRead = (id) => {
+        setNotifications((arr) => arr.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    };
+
+    const markAllAsRead = () => {
+        setNotifications((arr) => arr.map((n) => ({ ...n, unread: false })));
+    };
+
+    const removeNotification = (id) => {
+        setNotifications((arr) => arr.filter((n) => n.id !== id));
+    };
+
+
     // Report Search & Filters (US05, US06)
     const [reportQuery, setReportQuery] = useState('');
     const [fromDate, setFromDate] = useState('');
@@ -789,35 +804,91 @@ const OpsDashboard = ({ navigate }) => {
                 <div className="top">
                     <button onClick={() => setSidebarOpen(!sidebarOpen)} className="menu">☰</button>
                     <div className="actions">
-                        {/* Notifications (US05) */}
-                        <div className="notif">
-                            <button className="icon-btn" onClick={() => setNotifOpen(!notifOpen)} aria-label="Notifications">
-                                <Bell size={18} />
-                                {notifUnread > 0 && <span className="notif-dot">{notifUnread}</span>}
+                        {/* Admin-style dropdown UI, renamed to .notification-* */}
+                        <div className="notification-container">
+                            <button
+                                type="button"
+                                className="notification-trigger"
+                                aria-label="Notifications"
+                                onClick={() => setNotifOpen(!notifOpen)}
+                            >
+                                <Bell size={20} />
+                                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
                             </button>
+
                             {notifOpen && (
-                                <div className="notif-list">
-                                    <div className="notif-head">
-                                        <strong>Notifications</strong>
-                                        <button className="link-btn" onClick={() => setNotifications((arr) => arr.map((n) => ({ ...n, unread: false })))}>
-                                            Mark all read
-                                        </button>
+                                <div className="notification-dropdown">
+                                    <div className="notification-header">
+                                        <h5 className="notification-title">Notifications</h5>
+                                        {unreadCount > 0 && (
+                                            <button className="notification-mark-all" onClick={markAllAsRead}>
+                                                Mark all read
+                                            </button>
+                                        )}
                                     </div>
-                                    {notifications.length === 0 && <div className="notif-empty">No notifications</div>}
-                                    {notifications.map((n) => (
-                                        <button key={n.id} className={`notif-item ${n.unread ? 'unread' : ''}`} onClick={() => openReportFromNotif(n)}>
-                                            <div className="notif-title">{n.title}</div>
-                                            <div className="notif-time">{n.time}</div>
-                                        </button>
-                                    ))}
+
+                                    <div className="notification-list">
+                                        {notifications.length === 0 ? (
+                                            <div className="notification-empty">
+                                                <Bell size={40} />
+                                                <p>No notifications</p>
+                                            </div>
+                                        ) : (
+                                            notifications.map((n) => (
+                                                <div
+                                                    key={n.id}
+                                                    className={`notification-item ${n.unread ? 'unread' : ''}`}
+                                                    onClick={() => {
+                                                        markAsRead(n.id);
+                                                        openReportFromNotif(n);
+                                                    }}
+                                                >
+                                                    {/* Simple type chip — use 'file' for titles mentioning file/published; else 'subscription' */}
+                                                    <div
+                                                        className={`notification-icon ${n.title.toLowerCase().includes('published') || n.title.toLowerCase().includes('file')
+                                                            ? 'file'
+                                                            : 'subscription'
+                                                            }`}
+                                                    >
+                                                        <FileText size={18} />
+                                                    </div>
+
+                                                    <div className="notification-content">
+                                                        <h6>{n.title}</h6>
+                                                        <p>{n.reportId ? `Open report ${n.reportId}` : 'View details'}</p>
+                                                        <span className="notification-time">{n.time}</span>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        className="notification-close"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeNotification(n.id);
+                                                        }}
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {notifications.length > 0 && (
+                                        <div className="notification-footer">
+                                            <a href="#" className="notification-view-all">View All Activity</a>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
+                        {/* keep your logout button as-is */}
                         <button onClick={logout} className="logout-btn">
                             <LogOut style={{ width: 16, height: 16 }} /> Logout
                         </button>
                     </div>
+
                 </div>
 
                 <div className="content">
@@ -834,7 +905,7 @@ const OpsDashboard = ({ navigate }) => {
                     </div>
 
                     {/* Stat Cards */}
-                    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(5, 1fr)', marginBottom: 24 }}>
+                    {/* <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(5, 1fr)', marginBottom: 24 }}>
                         {[
                             { label: 'Active Connections', value: STORAGE.filter((s) => s.status === 'active').length, icon: <Database style={{ width: 20, height: 20, color: '#0473EA' }} /> },
                             { label: 'Pending Validation', value: VALIDATION_QUEUE.length, icon: <Shield style={{ width: 20, height: 20, color: '#f59e0b' }} /> },
@@ -842,7 +913,72 @@ const OpsDashboard = ({ navigate }) => {
                             { label: 'Published Reports', value: PUBLISHED.length, icon: <FileText style={{ width: 20, height: 20, color: '#8b5cf6' }} /> },
                             { label: 'Failed Operations', value: SYNC_JOBS.filter((j) => j.status === 'failed').length, icon: <AlertCircle style={{ width: 20, height: 20, color: '#dc2626' }} /> },
                         ].map((s) => (<StatCard key={s.label} {...s} />))}
+                    </div> */}
+
+                    {/* KPI — same size, 5 across, with Admin-style hover effects, keeping your icon colors */}
+                    <div className="kpi-grid">
+                        {/* Active Connections */}
+                        <div className="kpi-card" role="button" tabIndex={0}>
+                            <div className="kpi-top">
+                                <p className="kpi-label">Active Connections</p>
+                                <span className="kpi-icon">
+                                    <Database style={{ width: 20, height: 20, color: '#0473EA' }} />
+                                </span>
+                            </div>
+                            <h2 className="kpi-value">{STORAGE.filter((s) => s.status === 'active').length}</h2>
+
+                        </div>
+
+                        {/* Pending Validation */}
+                        <div className="kpi-card" role="button" tabIndex={0}>
+                            <div className="kpi-top">
+                                <p className="kpi-label">Pending Validation</p>
+                                <span className="kpi-icon">
+                                    <Shield style={{ width: 20, height: 20, color: '#f59e0b' }} />
+                                </span>
+                            </div>
+                            <h2 className="kpi-value">{VALIDATION_QUEUE.length}</h2>
+
+                        </div>
+
+                        {/* Sync Jobs Today */}
+                        <div className="kpi-card" role="button" tabIndex={0}>
+                            <div className="kpi-top">
+                                <p className="kpi-label">Sync Jobs Today</p>
+                                <span className="kpi-icon">
+                                    <RefreshCw style={{ width: 20, height: 20, color: '#10b981' }} />
+                                </span>
+                            </div>
+                            <h2 className="kpi-value">48</h2>
+
+                        </div>
+
+                        {/* Published Reports */}
+                        <div className="kpi-card" role="button" tabIndex={0}>
+                            <div className="kpi-top">
+                                <p className="kpi-label">Published Reports</p>
+                                <span className="kpi-icon">
+                                    <FileText style={{ width: 20, height: 20, color: '#8b5cf6' }} />
+                                </span>
+                            </div>
+                            <h2 className="kpi-value">{PUBLISHED.length}</h2>
+
+                        </div>
+
+                        {/* Failed Operations */}
+                        <div className="kpi-card" role="button" tabIndex={0}>
+                            <div className="kpi-top">
+                                <p className="kpi-label">Failed Operations</p>
+                                <span className="kpi-icon">
+                                    <AlertCircle style={{ width: 20, height: 20, color: '#dc2626' }} />
+                                </span>
+                            </div>
+                            <h2 className="kpi-value">{SYNC_JOBS.filter((j) => j.status === 'failed').length}</h2>
+
+                        </div>
                     </div>
+
+
 
                     {/* Tabs */}
                     <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />

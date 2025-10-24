@@ -135,7 +135,7 @@
     position: relative;
 }
 
-.notif-dot {
+/* .notif-dot {
     position: absolute;
     top: -4px;
     right: -4px;
@@ -165,7 +165,7 @@
     padding: 10px 12px;
     border-bottom: 1px solid #e5e7eb;
     font-size: 14px;
-}
+} */
 
 .link-btn {
     background: transparent;
@@ -175,7 +175,7 @@
     cursor: pointer;
 }
 
-.notif-item {
+/* .notif-item {
     width: 100%;
     text-align: left;
     padding: 10px 12px;
@@ -207,7 +207,7 @@
     padding: 12px;
     font-size: 13px;
     color: #6b7280;
-}
+} */
 
 /* Progress Bar */
 .progress-bar-bg {
@@ -753,4 +753,316 @@ th.col-org,
 td.col-org {
     min-width: 0 !important;
     max-width: none !important;
+}
+
+/* ===== Notifications (Admin style, renamed to .notification-*) ===== */
+.notification-container {
+    position: relative;
+    display: inline-block;
+}
+
+.notification-trigger {
+    position: relative;
+    cursor: pointer;
+    padding: 0.5rem;
+    border: none;
+    /* remove any outline or border */
+    outline: none;
+    /* ensure no gray ring */
+    background: transparent;
+    /* no background by default */
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+}
+
+
+.notification-trigger:hover {
+    background-color: #f1f5f9;
+}
+
+.notification-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #ef4444;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 380px;
+    max-height: 500px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.notification-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fc;
+}
+
+.notification-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.notification-mark-all {
+    background: none;
+    border: none;
+    color: #0473BA;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s ease;
+}
+
+.notification-mark-all:hover {
+    color: #38D200;
+    text-decoration: underline;
+}
+
+.notification-list {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.notification-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: #94a3b8;
+}
+
+.notification-empty p {
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.notification-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fc;
+}
+
+.notification-item.unread {
+    background-color: #eff6ff;
+}
+
+.notification-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(135deg, #0473BA, #38D200);
+}
+
+.notification-icon {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.notification-icon.subscription {
+    background: linear-gradient(135deg, #0473BA, #38D200);
+}
+
+.notification-icon.file {
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-content h6 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+}
+
+.notification-content p {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+}
+
+.notification-time {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    height: fit-content;
+}
+
+.notification-close:hover {
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.notification-footer {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+    background: #f8f9fc;
+}
+
+.notification-view-all {
+    color: #0473BA;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.notification-view-all:hover {
+    color: #38D200;
+    text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+    .notification-dropdown {
+        width: 320px;
+        right: -50px;
+    }
+}
+
+/* ===== KPI grid — 5 across, same size as original ===== */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    /* matches your old spacing */
+    margin-bottom: 24px;
+    /* matches old spacing */
+    overflow: visible;
+    /* allow hovered cards to visually grow */
+}
+
+/* Keep the existing .kpi-grid as-is */
+
+/* Make each card a simple vertical stack */
+.kpi-card {
+    position: relative;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid #0473BA;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-left-color 0.2s ease;
+    will-change: transform;
+    transform: translateZ(0);
+    display: flex;
+    /* new */
+    flex-direction: column;
+    /* new */
+}
+
+/* Subtle hover; no reflow */
+.kpi-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 10px 24px rgba(4, 115, 186, 0.15);
+    border-left-color: #38D200;
+    z-index: 2;
+}
+
+/* Top row: ensure a consistent height so numbers line up perfectly */
+.kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* This is the key: reserve enough space for 1–2 line titles + icon */
+    min-height: 46px;
+    /* tweak 44–52px if your titles differ */
+}
+
+/* Title + icon keep your original look */
+.kpi-label {
+    margin: 0;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Number sits a little lower and will align across all cards */
+.kpi-value {
+    margin: 8px 0 0 0;
+    /* moves the number down slightly */
+    font-size: 32px;
+    font-weight: 700;
+    color: #0473BA;
+    line-height: 1.1;
+    transition: color 0.2s ease;
+}
+
+.kpi-card:hover .kpi-value {
+    color: #38D200;
+}
+
+/* We removed the subline; if it still exists anywhere, hide it */
+.kpi-sub {
+    display: none;
 }
