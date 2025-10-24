@@ -54,7 +54,7 @@
 }
 
 .uga-btn-primary {
-  background: linear-gradient(135deg, #2B73D2 0%, #58B24C 100%);
+  background: #2563eb;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -63,13 +63,13 @@
   font-size: 14px;
   font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(43, 115, 210, 0.2);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
 }
 
 .uga-btn-primary:hover {
-  background: linear-gradient(135deg, #1E58A7 0%, #3D9639 100%);
+  background: #1d4ed8;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(43, 115, 210, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
 
 /* Search */
