@@ -12,7 +12,7 @@
   padding: 16px 24px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(88, 178, 76, 0.3);
-  z-index: 1000;
+  z-index: 10000;
   animation: slideIn 0.3s ease;
   font-weight: 600;
 }
@@ -20,7 +20,7 @@
 @keyframes slideIn {
   from {
     transform: translateX(400px);
-    opacity: 0;
+    opacity: 0.7;
   }
   to {
     transform: translateX(0);
@@ -41,10 +41,7 @@
   font-size: 2rem;
   margin-bottom: 0.5rem;
   font-weight: 700;
-  background: linear-gradient(90deg, #2B73D2 0%, #58B24C 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #2B73D2;
 }
 
 .fpm-subtitle {
@@ -98,17 +95,18 @@
 }
 
 .fpm-table thead {
-  background: linear-gradient(135deg, #2B73D2 0%, #58B24C 100%);
+  background: #f7fafc;
 }
 
 .fpm-table th {
   text-align: left;
   padding: 16px;
-  color: white;
+  color: #0047BB;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-bottom: 2px solid #00CC66;
 }
 
 .fpm-table td {
@@ -139,6 +137,8 @@
   background: #f7fafc;
   padding: 4px 8px;
   border-radius: 4px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .fpm-no-data {
@@ -189,14 +189,14 @@
 }
 
 .fpm-btn-edit {
-  background: linear-gradient(135deg, #2B73D2 0%, #1E58A7 100%);
+  background: #2563eb;
   color: white;
 }
 
 .fpm-btn-edit:hover {
-  background: linear-gradient(135deg, #1E58A7 0%, #153D73 100%);
+  background: #1d4ed8;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(43, 115, 210, 0.2);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.35);
 }
 
 .fpm-btn-delete {
@@ -319,17 +319,24 @@
     width: 100%;
   }
 
+  .fpm-container {
+    overflow-x: auto;
+  }
+
   .fpm-table {
     font-size: 0.75rem;
+    min-width: 720px;
   }
 
   .fpm-table th,
   .fpm-table td {
     padding: 12px 8px;
   }
-
   .fpm-modal {
     width: 95%;
     padding: 24px;
+  }
+  .fpm-scroll-container {
+    overflow-x: auto;
   }
 }

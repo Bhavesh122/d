@@ -67,7 +67,7 @@ const AuditLogs = () => {
               <div className="timeline-dot"></div>
               <div className="timeline-content">
                 <div className="d-flex justify-content-between mb-1">
-                  <span className="role-badge-small">{activity.role}</span>
+                  <span className={`role-badge-small ${activity.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{activity.role}</span>
                   <small className="text-muted">{activity.timestamp.split(' ')[1]}</small>
                 </div>
                 <div className="timeline-action">{activity.action}</div>
@@ -141,7 +141,7 @@ const AuditLogs = () => {
                 <tr key={log.id}>
                   <td className="text-muted">{log.timestamp}</td>
                   <td className="fw-semibold">{log.user}</td>
-                  <td><span className="role-badge">{log.role}</span></td>
+                  <td><span className={`role-badge ${log.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{log.role}</span></td>
                   <td><span className="action-badge">{log.action}</span></td>
                   <td>{log.details}</td>
                   <td>
