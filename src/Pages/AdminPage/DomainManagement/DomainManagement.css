@@ -17,9 +17,7 @@
   
 .dm-title {
   font-size: 2rem;
-  background: linear-gradient(90deg, #0473EA 0%, #38D200 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #2B73D2;
   margin: 0;
   font-weight: 700;
 }
