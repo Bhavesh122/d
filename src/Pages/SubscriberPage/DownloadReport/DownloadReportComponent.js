@@ -12,14 +12,15 @@ const DownloadReportComponent = () => {
     const [selectedReport, setSelectedReport] = useState(null);
     const [selectedFile,setSelectedFile] = useState(null);
     const [showFavorites, setShowFavorites] = useState(false);
+    const [selectedReports, setSelectedReports] = useState([]);
 
     const [reports, setReports] = useState([
-        { id: 1, fileName: 'Q4_2024_Financial_Report', title: 'Q4 2024 Financial Report', description: 'Comprehensive quarterly financial statements, P&L analysis, and balance sheet review', domain: 'Finance', formats: ['pdf', 'xlsx', 'csv'], size: { pdf: '2.4 MB', xlsx: '1.8 MB', csv: '950 KB' }, publishedDate: '15 Dec 2024', downloads: 145, version: 'v1.2', recommendedFormat: 'pdf', favorite: false },
-        { id: 2, fileName: 'Risk_Exposure_Summary', title: 'Risk Exposure Summary', description: 'Value at Risk (VaR), stress testing results, and compliance reporting metrics', domain: 'Risk Management', formats: ['xlsx', 'csv', 'pdf'], size: { pdf: '1.2 MB', xlsx: '856 KB', csv: '420 KB' }, publishedDate: '18 Dec 2024', downloads: 98, version: 'v2.0', recommendedFormat: 'xlsx', favorite: false },
-        { id: 3, fileName: 'Trading_Performance_Report', title: 'Trading Performance Report', description: 'Trade blotter analysis, position tracking, and performance analytics dashboard', domain: 'Trading', formats: ['pdf', 'xlsx'], size: { pdf: '3.1 MB', xlsx: '2.2 MB' }, publishedDate: '10 Dec 2024', downloads: 203, version: 'v1.0', recommendedFormat: 'pdf', favorite: false },
-        { id: 4, fileName: 'HR_Analytics_Monthly', title: 'HR Analytics Monthly', description: 'Workforce metrics, hiring funnel analysis, retention and employee engagement data', domain: 'HR Analytics', formats: ['pdf', 'xlsx'], size: { pdf: '1.9 MB', xlsx: '1.4 MB' }, publishedDate: '20 Dec 2024', downloads: 167, version: 'v1.1', recommendedFormat: 'pdf', favorite: false },
-        { id: 5, fileName: 'Operations_KPI_Dashboard', title: 'Operations KPI Dashboard', description: 'Process efficiency metrics, throughput analysis, SLA compliance, and incident tracking', domain: 'Operations', formats: ['pdf', 'csv', 'xlsx'], size: { pdf: '2.8 MB', xlsx: '2.1 MB', csv: '1.1 MB' }, publishedDate: '22 Dec 2024', downloads: 89, version: 'v2.1', recommendedFormat: 'pdf', favorite: false },
-        { id: 6, fileName: 'Compliance_Audit_Report', title: 'Compliance Audit Report', description: 'Audit trails, policy adherence tracking, and regulatory submission documentation', domain: 'Compliance', formats: ['pdf', 'xlsx'], size: { pdf: '2.2 MB', xlsx: '1.6 MB' }, publishedDate: '12 Dec 2024', downloads: 134, version: 'v1.0', recommendedFormat: 'pdf', favorite: false }
+        { id: 1, title: 'Q4 2024 Financial Report', description: 'Comprehensive quarterly financial statements, P&L analysis, and balance sheet review', domain: 'Finance', publishedDate: '15 Dec 2024', version: 'v1.2', favorite: false },
+        { id: 2, title: 'Risk Exposure Summary', description: 'Value at Risk (VaR), stress testing results, and compliance reporting metrics', domain: 'Risk Management', publishedDate: '18 Dec 2024', version: 'v2.0', favorite: false },
+        { id: 3, title: 'Trading Performance Report', description: 'Trade blotter analysis, position tracking, and performance analytics dashboard', domain: 'Trading', publishedDate: '10 Dec 2024', version: 'v1.0', favorite: false },
+        { id: 4, title: 'HR Analytics Monthly', description: 'Workforce metrics, hiring funnel analysis, retention and employee engagement data', domain: 'HR Analytics', publishedDate: '20 Dec 2024', version: 'v1.1', favorite: false },
+        { id: 5, title: 'Operations KPI Dashboard', description: 'Process efficiency metrics, throughput analysis, SLA compliance, and incident tracking', domain: 'Operations', publishedDate: '22 Dec 2024', version: 'v2.1', favorite: false },
+        { id: 6, title: 'Compliance Audit Report', description: 'Audit trails, policy adherence tracking, and regulatory submission documentation', domain: 'Compliance', publishedDate: '12 Dec 2024', version: 'v1.0', favorite: false }
     ]);
 
     const domains = ['Finance', 'Risk Management', 'Trading', 'HR Analytics', 'Operations', 'Compliance'];
@@ -44,9 +45,31 @@ const DownloadReportComponent = () => {
         link.click();
     };
 
-    const getFileIcon = (format) => {
-        const icons = { pdf: 'pdf', xlsx: 'excel', csv: 'spreadsheet' };
-        return `bi-file-earmark-${icons[format] || 'text'}-fill`;
+    const handleSelectReport = (id) => {
+        setSelectedReports(prev => 
+            prev.includes(id) ? prev.filter(reportId => reportId !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedReports.length === filteredReports.length) {
+            setSelectedReports([]);
+        } else {
+            setSelectedReports(filteredReports.map(r => r.id));
+        }
+    };
+
+    const handleDownloadSelected = () => {
+        
+        // Download each selected report
+        selectedReports.forEach(id => {
+            const report = reports.find(r => r.id === id);
+            if (report) {
+                handleDownload(PDF_FILE);
+            }
+        });
+        // Clear selections after download
+        setSelectedReports([]);
     };
 
     if(selectedFile) return <PDFViewer fileName={selectedFile} onBack={() => setSelectedFile(null)} />;
@@ -95,6 +118,27 @@ const DownloadReportComponent = () => {
                             </button>
                         </div>
                     </div>
+                    {selectedReports.length > 0 && (
+                        <div className="row mt-3">
+                            <div className="col-12">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <span className="text-muted">
+                                        <i className="bi bi-check-square me-2"></i>
+                                        {selectedReports.length} report(s) selected
+                                    </span>
+                                    <div className="d-flex gap-2">
+                                        <button className="btn btn-sm btn-outline-secondary" onClick={handleSelectAll}>
+                                            {selectedReports.length === filteredReports.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <button className="btn btn-download" onClick={handleDownloadSelected}>
+                                            <i className="bi bi-download me-2"></i>
+                                            Download Selected
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -106,6 +150,15 @@ const DownloadReportComponent = () => {
                             <div className="card report-card shadow-sm">
                                 <div className="card-body">
                                     <div className="d-flex align-items-start">
+                                        <div className="form-check me-3">
+                                            <input
+                                                className="form-check-input"
+                                                type="checkbox"
+                                                checked={selectedReports.includes(r.id)}
+                                                onChange={() => handleSelectReport(r.id)}
+                                                style={{ width: '20px', height: '20px', marginTop: '5px', cursor: 'pointer' }}
+                                            />
+                                        </div>
                                         <div className="report-icon me-3">
                                             <i className="bi bi-file-earmark-text"></i>
                                         </div>
@@ -161,5 +214,4 @@ const DownloadReportComponent = () => {
         </div>
     );
 };
-
 export default DownloadReportComponent;

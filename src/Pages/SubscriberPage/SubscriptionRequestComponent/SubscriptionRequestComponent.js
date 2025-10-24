@@ -6,15 +6,16 @@ const SubscriptionRequestComponent = () => {
     const [showRequestModal, setShowRequestModal] = useState(false);
     const [requestingDomain, setRequestingDomain] = useState(null);
     const [requestReason, setRequestReason] = useState('');
+    const [reasonError, setReasonError] = useState('');
 
     // Domain catalog instead of individual files/reports
     const [domains, setDomains] = useState([
-        { id: 1, name: 'Finance', description: 'Financial statements, P&L, balance sheets, forecasting', status: null },
+        { id: 1, name: 'Finance', description: 'Financial statements, P&L, balance sheets, forecasting', status: null, requestReason: 'Need access for quarterly reporting' },
         { id: 2, name: 'Risk Management', description: 'Risk exposure, VaR, stress testing, compliance reporting', status: null },
         { id: 3, name: 'Trading', description: 'Trade blotter, positions, performance analytics, market data', status: null },
         { id: 4, name: 'HR Analytics', description: 'Workforce metrics, hiring funnel, retention and engagement', status: null },
         { id: 5, name: 'Operations', description: 'Process KPIs, throughput, SLAs, incident management', status: null },
-        { id: 6, name: 'Compliance', description: 'Audit trails, policy adherence, regulatory submissions', status: null }
+        { id: 6, name: 'Compliance', description: 'Audit trails, policy adherence, regulatory submissions', status: 'approved' }
     ]);
 
     const filteredDomains = domains.filter(d => {
@@ -26,12 +27,13 @@ const SubscriptionRequestComponent = () => {
     const handleRequest = (domain) => {
         setRequestingDomain(domain);
         setRequestReason('');
+        setReasonError('');
         setShowRequestModal(true);
     };
 
     const handleSubmitRequest = () => {
         if (!requestReason.trim()) {
-            alert('Please provide a reason for requesting access');
+            setReasonError('Please type a reason for your request');
             return;
         }
         setDomains(domains.map(d => 
@@ -42,6 +44,7 @@ const SubscriptionRequestComponent = () => {
         setShowRequestModal(false);
         setRequestingDomain(null);
         setRequestReason('');
+        setReasonError('');
     };
 
     const handleCancel = (id) => setDomains(domains.map(d => d.id === id && d.status === 'requested' ? { ...d, status: null, requestReason: '' } : d));
@@ -89,22 +92,6 @@ const SubscriptionRequestComponent = () => {
                             <i className="bi bi-grid-3x3-gap me-2"></i>
                             All Domains
                             <span className="badge ms-2">{domains.length}</span>
-                        </button>
-                        <button
-                            className={`btn filter-btn ${filterStatus === 'requested' ? 'active' : 'btn-outline-warning'}`}
-                            onClick={() => setFilterStatus('requested')}
-                        >
-                            <i className="bi bi-clock-history me-2"></i>
-                            Requested
-                            <span className="badge ms-2">{getCount('requested')}</span>
-                        </button>
-                        <button
-                            className={`btn filter-btn ${filterStatus === 'approved' ? 'active' : 'btn-outline-success'}`}
-                            onClick={() => setFilterStatus('approved')}
-                        >
-                            <i className="bi bi-check-circle me-2"></i>
-                            Approved
-                            <span className="badge ms-2">{getCount('approved')}</span>
                         </button>
                     </div>
                 </div>
@@ -239,15 +226,24 @@ const SubscriptionRequestComponent = () => {
                                 rows="4"
                                 placeholder="Please explain why you need access to this domain..."
                                 value={requestReason}
-                                onChange={(e) => setRequestReason(e.target.value)}
+                                onChange={(e) => {
+                                    setRequestReason(e.target.value);
+                                    if (reasonError) setReasonError('');
+                                }}
                                 style={{
                                     width: '100%',
                                     padding: '10px',
                                     borderRadius: '4px',
-                                    border: '1px solid #ddd',
+                                    border: reasonError ? '1px solid #dc3545' : '1px solid #ddd',
                                     fontSize: '14px'
                                 }}
                             />
+                            {reasonError && (
+                                <div style={{ color: '#dc3545', fontSize: '13px', marginTop: '5px' }}>
+                                    <i className="bi bi-exclamation-circle me-1"></i>
+                                    {reasonError}
+                                </div>
+                            )}
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                             <button

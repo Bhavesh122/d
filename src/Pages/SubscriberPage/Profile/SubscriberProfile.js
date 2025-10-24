@@ -17,9 +17,8 @@ const SubscriberProfile = () => {
     ];
 
     const stats = [
-        { label: 'Active Subscriptions', value: '5', color: '#0473BA' },
-        { label: 'Reports Downloaded', value: '142', color: '#38D200' },
-        { label: 'Pending Requests', value: '2', color: '#FFA726' }
+        { label: 'Reports Downloaded', value: '142', color: '#0473BA' },
+        { label: 'Favorite Reports', value: '3', color: '#38D200' }
     ];
 
     return (
