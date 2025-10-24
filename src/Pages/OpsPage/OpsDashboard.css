@@ -318,47 +318,6 @@ body {
     height: 8px;
 }
 
-/* Add right padding so buttons don't touch the edge */
-.validation-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-right: 12px;
-    /* NEW: gives breathing room on right edge */
-    box-sizing: border-box;
-}
-
-.validation-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    border-right: 1px solid #e5e7eb;
-    /* visually aligns with card border */
-    border-radius: 0 12px 12px 0;
-}
-
-
-/* Fix overlapping in Validation Queue */
-/* --- Fix Validation Queue layout --- */
-
-/* 1️⃣  Widen Report Name column and allow wrapping */
-.validation-table th:nth-child(1),
-.validation-table td:nth-child(1) {
-    min-width: 260px;
-    max-width: 340px;
-    white-space: normal;
-    word-break: break-word;
-}
-
-/* 2️⃣  Add a little breathing room on the right edge */
-.validation-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-right: 12px;
-    /* prevents Reject button from touching card edge */
-    box-sizing: border-box;
-}
-
 
 
 .approve-btn,
@@ -538,25 +497,6 @@ body {
     background: #f9fafb;
 }
 
-/* --- Activity Log --- */
-.audit-wrap {
-    width: 100%;
-    overflow-x: auto;
-}
-
-.audit-table {
-    width: max-content;
-    min-width: 800px;
-    border-collapse: collapse;
-    table-layout: auto;
-}
-
-.audit-table th,
-.audit-table td {
-    padding: 16px 20px;
-    border-bottom: 1px solid #f3f4f6;
-    text-align: left;
-}
 
 /* Responsive */
 @media (max-width: 1100px) {
