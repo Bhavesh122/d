@@ -13,7 +13,7 @@
   padding: 16px 24px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(88, 178, 76, 0.3);
-  z-index: 1000;
+  z-index: 10001;
   animation: slideIn 0.3s ease;
   font-weight: 600;
 }

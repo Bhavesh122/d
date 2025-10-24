@@ -100,20 +100,43 @@
     cursor: pointer;
     color: #495057;
     font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
 .ar-filter-tab:hover {
     background-color: #f8f9fa;
-    border-color: #0047BB;
+    border-color: #cbd5e0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.ar-filter-tab.ar-active {
-    background: linear-gradient(135deg, #0047BB 0%, #0066FF 100%);
-    color: white;
-    border-color: #0047BB;
-    box-shadow: 0 2px 8px rgba(0, 71, 187, 0.3);
+.ar-filter-tab.ar-active:nth-child(1) {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border-color: #2196F3;
+    color: #1565C0;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.ar-filter-tab.ar-active:nth-child(2) {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+    border-color: #FF9800;
+    color: #E65100;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.ar-filter-tab.ar-active:nth-child(3) {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-color: #00CC66;
+    color: #2E7D32;
+    box-shadow: 0 4px 12px rgba(0, 204, 102, 0.3);
+}
+
+.ar-filter-tab.ar-active:nth-child(4) {
+    background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
+    border-color: #EF5350;
+    color: #C62828;
+    box-shadow: 0 4px 12px rgba(239, 83, 80, 0.3);
 }
 
 .ar-cards-container {
@@ -192,6 +215,8 @@
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    cursor: default;
 }
 
 .ar-status-pending {
@@ -200,16 +225,37 @@
     border: 2px solid #FF9800;
 }
 
+.ar-status-pending:hover {
+    background: linear-gradient(135deg, #FFE0B2 0%, #FFCC80 100%);
+    border-color: #F57C00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
 .ar-status-approved {
     background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
     color: #2E7D32;
     border: 2px solid #00CC66;
 }
 
+.ar-status-approved:hover {
+    background: linear-gradient(135deg, #C8E6C9 0%, #A5D6A7 100%);
+    border-color: #00AA55;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 204, 102, 0.3);
+}
+
 .ar-status-rejected {
     background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
     color: #C62828;
     border: 2px solid #EF5350;
+}
+
+.ar-status-rejected:hover {
+    background: linear-gradient(135deg, #FFCDD2 0%, #EF9A9A 100%);
+    border-color: #E53935;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 83, 80, 0.3);
 }
 
 .ar-btn-group {

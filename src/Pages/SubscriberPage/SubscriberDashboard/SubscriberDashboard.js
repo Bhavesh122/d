@@ -3,7 +3,11 @@ import React, { useState } from 'react';
 import SubscriptionRequestComponent from '../SubscriptionRequestComponent/SubscriptionRequestComponent';
 import DownloadReportComponent from '../DownloadReport/DownloadReportComponent';
 import SubscriptionDashboard from '../SubscriptionStatusPage/SubsciptionDashboard';
+import SubscriberNotification from '../SubscriberNotification/SubscriberNotification';
+import SubscriberProfile from '../Profile/SubscriberProfile';
+import { LogOut } from 'lucide-react';
 import '../../AdminPage/AdminDashBoard/Dashboard.css';
+import './SubscriberDashboard.css';
 
 const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     const [view, setView] = useState('dashboard');
@@ -36,13 +40,15 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         { name: 'Dashboard', view: 'dashboard' },
         { name: 'My Subscriptions', view: 'subscriptions' },
         { name: 'Request Subscription', view: 'request' },
-        { name: 'Download Reports', view: 'downloads' }
+        { name: 'Download Reports', view: 'downloads' },
+        { name: 'Profile', view: 'profile' }
     ];
 
     const renderContent = () => {
         if (view === 'subscriptions') return <SubscriptionDashboard subscriptions={subscriptions} />;
         if (view === 'request') return <SubscriptionRequestComponent subscriptions={subscriptions} />;
         if (view === 'downloads') return <DownloadReportComponent reports={reports} subscriptions={subscriptions} />;
+        if (view === 'profile') return <SubscriberProfile />;
 
         return (
             <>
@@ -64,7 +70,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                             <thead><tr><th>Domain</th><th>Status</th></tr></thead>
                             <tbody>
                                 {subscriptions.slice(0, 5).map(s => (
-                                    <tr key={s.id}><td className="bold">{s.domain}</td><td>{s.status}</td></tr>
+                                    <tr key={s.id}><td className="bold">{s.domain}</td><td><span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span></td></tr>
                                 ))}
                             </tbody>
                         </table>
@@ -108,8 +114,11 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 <div className="top">
                     <button onClick={() => setOpen(!open)} className="menu">☰</button>
                     <div className="actions">
-                        <div className="notif"> <span className="dot"></span></div>
-                        <button onClick={logout} className="logout-btn">Logout</button>
+                        <SubscriberNotification />
+                        <button onClick={logout} className="logout-btn">
+                            <LogOut style={{ width: 16, height: 16 }} />
+                            Logout
+                        </button>
                     </div>
                 </div>
                 <div className="content">{renderContent()}</div>

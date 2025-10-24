@@ -124,6 +124,7 @@
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 71, 187, 0.1);
     border: 1px solid #e2e8f0;
+    table-layout: fixed;
   }
   
   .dm-table th,
@@ -131,6 +132,9 @@
     padding: 1rem;
     text-align: left;
     border-bottom: 1px solid #e2e8f0;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
   
   .dm-table th {

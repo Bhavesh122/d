@@ -65,6 +65,7 @@ const ApproveRejectSubscription = () => {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectingSubscription, setRejectingSubscription] = useState(null);
     const [rejectionReason, setRejectionReason] = useState("");
+    const [otherReasonText, setOtherReasonText] = useState("");
     const [loadingAD, setLoadingAD] = useState(true);
 
     useEffect(() => {
@@ -134,10 +135,13 @@ const ApproveRejectSubscription = () => {
         setShowRejectModal(false);
         setRejectingSubscription(null);
         setRejectionReason("");
+        setOtherReasonText("");
     };
 
     const handleReject = () => {
-        if (!rejectionReason.trim()) {
+        const finalReason = rejectionReason === "Other" ? otherReasonText : rejectionReason;
+        
+        if (!finalReason.trim()) {
             alert("Please provide a reason for rejection");
             return;
         }
@@ -145,7 +149,7 @@ const ApproveRejectSubscription = () => {
         setSubscriptions((prev) =>
             prev.map((sub) =>
                 sub.id === rejectingSubscription.id 
-                    ? { ...sub, status: "Rejected", rejectionReason } 
+                    ? { ...sub, status: "Rejected", rejectionReason: finalReason } 
                     : sub
             )
         );
@@ -329,7 +333,8 @@ const ApproveRejectSubscription = () => {
                                     className="ar-modal-textarea"
                                     placeholder="Please specify the reason..."
                                     rows="3"
-                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    value={otherReasonText}
+                                    onChange={(e) => setOtherReasonText(e.target.value)}
                                 />
                             )}
                         </div>
