@@ -1,28 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./DomainManagement.css";
+import domainService from "../../../services/domainService";
 
 export const DomainManagement = () => {
-  const [domains, setDomains] = useState([
-    { 
-      id: "1", 
-      name: "Financial Reports", 
-      description: "All financial and accounting reports", 
-      createdDate: "2024-01-15" 
-    },
-    { 
-      id: "2", 
-      name: "Operations", 
-      description: "Operational metrics and performance reports", 
-      createdDate: "2024-02-20" 
-    },
-    { 
-      id: "3", 
-      name: "HR Analytics", 
-      description: "Human resources and workforce analytics", 
-      createdDate: "2024-03-10" 
-    }
-  ]);
-
+  const [domains, setDomains] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingDomain, setEditingDomain] = useState(null);
   const [formData, setFormData] = useState({ name: "", description: "" });
@@ -30,6 +11,25 @@ export const DomainManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteDomainId, setDeleteDomainId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch domains from backend on component mount
+  useEffect(() => {
+    fetchDomains();
+  }, []);
+
+  const fetchDomains = async () => {
+    try {
+      setLoading(true);
+      const data = await domainService.getAllDomains();
+      setDomains(data);
+    } catch (error) {
+      setNotification("Error loading domains. Please check if backend is running.");
+      setTimeout(() => setNotification(""), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openModal = (domain = null) => {
     setEditingDomain(domain);
@@ -47,47 +47,39 @@ export const DomainManagement = () => {
     setFormData({ name: "", description: "" });
   };
 
-  const saveDomain = () => {
+  const saveDomain = async () => {
     if (!formData.name.trim()) {
       setNotification("Domain name is required");
       setTimeout(() => setNotification(""), 2000);
       return;
     }
 
-    const isDuplicate = domains.some(
-      (d) => 
-        d.name.toLowerCase() === formData.name.trim().toLowerCase() && 
-        d.id !== editingDomain?.id
-    );
-    
-    if (isDuplicate) {
-      setNotification("Domain name already exists");
-      setTimeout(() => setNotification(""), 2000);
-      return;
+    try {
+      if (editingDomain) {
+        // Update existing domain
+        await domainService.updateDomain(editingDomain.id, {
+          name: formData.name,
+          description: formData.description
+        });
+        setNotification("Domain updated successfully");
+      } else {
+        // Add new domain
+        await domainService.addDomain({
+          name: formData.name,
+          description: formData.description
+        });
+        setNotification("Domain created successfully");
+      }
+      
+      // Refresh domains list
+      await fetchDomains();
+      closeModal();
+      setTimeout(() => setNotification(""), 3000);
+    } catch (error) {
+      const errorMessage = error.message || "An error occurred while saving the domain";
+      setNotification(errorMessage);
+      setTimeout(() => setNotification(""), 3000);
     }
-
-    if (editingDomain) {
-      setDomains(
-        domains.map(d => 
-          d.id === editingDomain.id 
-            ? { ...d, name: formData.name, description: formData.description } 
-            : d
-        )
-      );
-      setNotification("Domain updated successfully");
-    } else {
-      const newDomain = {
-        id: Date.now().toString(),
-        name: formData.name,
-        description: formData.description,
-        createdDate: new Date().toISOString().split("T")[0]
-      };
-      setDomains([...domains, newDomain]);
-      setNotification("Domain created successfully");
-    }
-
-    closeModal();
-    setTimeout(() => setNotification(""), 3000);
   };
 
   const openDeleteConfirm = (domainId) => {
@@ -100,11 +92,17 @@ export const DomainManagement = () => {
     setDeleteDomainId(null);
   };
 
-  const deleteDomain = () => {
-    setDomains(domains.filter(d => d.id !== deleteDomainId));
-    setNotification("Domain deleted successfully");
-    closeDeleteConfirm();
-    setTimeout(() => setNotification(""), 3000);
+  const deleteDomain = async () => {
+    try {
+      await domainService.deleteDomain(deleteDomainId);
+      setNotification("Domain deleted successfully");
+      await fetchDomains();
+      closeDeleteConfirm();
+      setTimeout(() => setNotification(""), 3000);
+    } catch (error) {
+      setNotification("Error deleting domain");
+      setTimeout(() => setNotification(""), 3000);
+    }
   };
 
   const filteredDomains = domains.filter(

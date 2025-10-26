@@ -1,9 +1,9 @@
-package com.yourcompany.domainmanagement.controller;
+package rwtool.adminpage.admin_domain.controller;
 
-import com.yourcompany.domainmanagement.dto.ApprovalDecisionDTO;
-import com.yourcompany.domainmanagement.dto.SubscriptionRequestDTO;
-import com.yourcompany.domainmanagement.model.SubscriptionRequest;
-import com.yourcompany.domainmanagement.service.SubscriptionRequestService;
+import rwtool.adminpage.admin_domain.dto.ApprovalDecisionDTO;
+import rwtool.adminpage.admin_domain.dto.SubscriptionRequestDTO;
+import rwtool.adminpage.admin_domain.model.SubscriptionRequest;
+import rwtool.adminpage.admin_domain.service.SubscriptionRequestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

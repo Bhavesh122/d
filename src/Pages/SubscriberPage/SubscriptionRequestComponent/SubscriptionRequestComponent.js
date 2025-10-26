@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './SubscriptionRequest.css';
+import domainService from '../../../services/domainService';
+import subscriptionService from '../../../services/subscriptionService';
 const SubscriptionRequestComponent = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -8,15 +10,57 @@ const SubscriptionRequestComponent = () => {
     const [requestReason, setRequestReason] = useState('');
     const [reasonError, setReasonError] = useState('');
 
-    // Domain catalog instead of individual files/reports
-    const [domains, setDomains] = useState([
-        { id: 1, name: 'Finance', description: 'Financial statements, P&L, balance sheets, forecasting', status: null, requestReason: 'Need access for quarterly reporting' },
-        { id: 2, name: 'Risk Management', description: 'Risk exposure, VaR, stress testing, compliance reporting', status: null },
-        { id: 3, name: 'Trading', description: 'Trade blotter, positions, performance analytics, market data', status: null },
-        { id: 4, name: 'HR Analytics', description: 'Workforce metrics, hiring funnel, retention and engagement', status: null },
-        { id: 5, name: 'Operations', description: 'Process KPIs, throughput, SLAs, incident management', status: null },
-        { id: 6, name: 'Compliance', description: 'Audit trails, policy adherence, regulatory submissions', status: 'approved' }
-    ]);
+    // Domain catalog fetched from backend
+    const [domains, setDomains] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [userSubscriptions, setUserSubscriptions] = useState([]);
+    const [notification, setNotification] = useState('');
+
+    // TODO: Replace with actual user from auth context/session
+    // Example: const currentUser = useAuth(); or get from Redux/Context
+    const currentUser = {
+        name: 'Tony Stark',
+        email: 'tony3000@stark.com',
+        domain: 'Finance',
+        department: 'Engineering',
+        role: 'Subscriber'
+    };
+
+    // Fetch available domains and user subscriptions from backend
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            // Fetch all domains
+            const domainsData = await domainService.getAllDomains();
+            
+            // Fetch user's subscription requests
+            const subscriptionsData = await subscriptionService.getRequestsByUser(currentUser.email);
+            setUserSubscriptions(subscriptionsData);
+            
+            // Map domains with subscription status
+            const domainsWithStatus = domainsData.map(domain => {
+                const subscription = subscriptionsData.find(sub => sub.domainId === domain.id);
+                return {
+                    ...domain,
+                    subscriptionId: subscription?.id || null,
+                    status: subscription?.status?.toLowerCase() || null,
+                    requestReason: subscription?.requestReason || '',
+                    rejectionReason: subscription?.rejectionReason || ''
+                };
+            });
+            setDomains(domainsWithStatus);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setNotification('Error loading domains. Please try again.');
+            setTimeout(() => setNotification(''), 3000);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredDomains = domains.filter(d => {
         const q = searchQuery.toLowerCase();
@@ -31,27 +75,70 @@ const SubscriptionRequestComponent = () => {
         setShowRequestModal(true);
     };
 
-    const handleSubmitRequest = () => {
+    const handleSubmitRequest = async () => {
         if (!requestReason.trim()) {
             setReasonError('Please type a reason for your request');
             return;
         }
-        setDomains(domains.map(d => 
-            d.id === requestingDomain.id && !d.status 
-                ? { ...d, status: 'requested', requestReason } 
-                : d
-        ));
-        setShowRequestModal(false);
-        setRequestingDomain(null);
-        setRequestReason('');
-        setReasonError('');
+
+        try {
+            // Create subscription request with user profile info
+            const requestData = {
+                domainId: requestingDomain.id,
+                domainName: requestingDomain.name,
+                requestReason: requestReason,
+                userName: currentUser.name,
+                userEmail: currentUser.email,
+                userDepartment: currentUser.domain, // Send domain from user profile
+                userRole: currentUser.role
+            };
+
+            await subscriptionService.createRequest(requestData);
+            
+            // Refresh data to show updated status
+            await fetchData();
+            
+            setNotification('Subscription request submitted successfully!');
+            setTimeout(() => setNotification(''), 3000);
+            
+            setShowRequestModal(false);
+            setRequestingDomain(null);
+            setRequestReason('');
+            setReasonError('');
+        } catch (error) {
+            const errorMessage = error.message || 'Failed to submit request';
+            setReasonError(errorMessage);
+        }
     };
 
-    const handleCancel = (id) => setDomains(domains.map(d => d.id === id && d.status === 'requested' ? { ...d, status: null, requestReason: '' } : d));
+    const handleCancel = async (domainId, subscriptionId) => {
+        try {
+            await subscriptionService.cancelRequest(subscriptionId, currentUser.email);
+            await fetchData();
+            setNotification('Request cancelled successfully');
+            setTimeout(() => setNotification(''), 3000);
+        } catch (error) {
+            setNotification('Error cancelling request');
+            setTimeout(() => setNotification(''), 3000);
+        }
+    };
     const getCount = (status) => domains.filter(d => d.status === status).length;
 
     return (
         <div className="subscription-container">
+            {/* Notification */}
+            {notification && (
+                <div className="alert alert-info alert-dismissible fade show" role="alert" style={{
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    zIndex: 9999,
+                    minWidth: '300px'
+                }}>
+                    {notification}
+                </div>
+            )}
+
             {/* Hero Section */}
             <div className="hero-section mb-5">
                 <div className="d-flex align-items-center mb-3">
@@ -153,7 +240,7 @@ const SubscriptionRequestComponent = () => {
                                                 <i className="bi bi-check-circle me-2"></i>
                                                 Access Granted
                                             </button>
-                                        ) : d.status === 'requested' ? (
+                                        ) : d.status === 'pending' ? (
                                             <div className="d-flex gap-2">
                                                 <button className="btn btn-warning flex-grow-1" disabled>
                                                     <i className="bi bi-hourglass-split me-2"></i>
@@ -161,10 +248,22 @@ const SubscriptionRequestComponent = () => {
                                                 </button>
                                                 <button
                                                     className="btn btn-outline-danger"
-                                                    onClick={() => handleCancel(d.id)}
+                                                    onClick={() => handleCancel(d.id, d.subscriptionId)}
                                                 >
                                                     <i className="bi bi-x-circle"></i>
                                                 </button>
+                                            </div>
+                                        ) : d.status === 'rejected' ? (
+                                            <div>
+                                                <button className="btn btn-danger w-100 mb-2" disabled>
+                                                    <i className="bi bi-x-circle me-2"></i>
+                                                    Request Rejected
+                                                </button>
+                                                {d.rejectionReason && (
+                                                    <small className="text-danger d-block">
+                                                        Reason: {d.rejectionReason}
+                                                    </small>
+                                                )}
                                             </div>
                                         ) : (
                                             <button

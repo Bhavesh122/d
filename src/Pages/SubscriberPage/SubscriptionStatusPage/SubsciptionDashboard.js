@@ -1,26 +1,39 @@
 // SubscriptionDashboard.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import StatusBadge from "./StatusBadge"; // default export
+import subscriptionService from "../../../services/subscriptionService";
 
 export default function SubscriptionDashboard() {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const mockSubscriptions = [
-        { id: "1", reportDomain: "Financial Performance Report Q4 2024", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Approved", department: "Finance Department" },
-        { id: "2", reportDomain: "Market Analysis Report - Asia Pacific", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Pending", department: "Finance Department" },
-        { id: "3", reportDomain: "Risk Assessment Report 2024", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Approved", department: "Finance Department" },
-        { id: "4", reportDomain: "Customer Satisfaction Survey Results", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Rejected", department: "Finance Department" },
-        { id: "5", reportDomain: "Technology Infrastructure Review", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Pending", department: "Finance Department" },
-        { id: "6", reportDomain: "HR Workforce Planning Report", organization: "Standard Chartered Bank", requestDate: "2024-03-15", status: "Approved", department: "Finance Department" },
-    ];
+    // Mock user email - In production, get from auth context/session
+    const currentUserEmail = "tony3000@stark.com";
 
-    const filtered = mockSubscriptions.filter((sub) => {
+    useEffect(() => {
+        fetchUserSubscriptions();
+    }, []);
+
+    const fetchUserSubscriptions = async () => {
+        try {
+            setLoading(true);
+            const data = await subscriptionService.getRequestsByUser(currentUserEmail);
+            setSubscriptions(data);
+        } catch (error) {
+            console.error('Error fetching subscriptions:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filtered = subscriptions.filter((sub) => {
         const q = searchQuery.toLowerCase();
         const matchesSearch =
             q === "" ||
-            sub.reportDomain.toLowerCase().includes(q) ||
-            sub.organization.toLowerCase().includes(q);
+            sub.domainName.toLowerCase().includes(q) ||
+            sub.userName.toLowerCase().includes(q);
         const matchesStatus =
             statusFilter === "All" ||
             sub.status.toLowerCase() === statusFilter.toLowerCase();
@@ -144,7 +157,11 @@ export default function SubscriptionDashboard() {
                         </div>
 
                         {/* Table */}
-                        {filtered.length === 0 ? (
+                        {loading ? (
+                            <div style={{ textAlign: "center", padding: "48px 0" }}>
+                                <p style={{ color: "#7a8fae" }}>Loading subscriptions...</p>
+                            </div>
+                        ) : filtered.length === 0 ? (
                             <div style={{ textAlign: "center", padding: "48px 0" }}>
                                 <div
                                     style={{
@@ -210,7 +227,7 @@ export default function SubscriptionDashboard() {
                                         >
                                             <td style={{ padding: "12px 0" }}>
                                                 <div style={{ fontWeight: 600, color: "#0b3f7a" }}>
-                                                    {sub.reportDomain}
+                                                    {sub.domainName}
                                                 </div>
                                                 <div
                                                     style={{
@@ -228,7 +245,7 @@ export default function SubscriptionDashboard() {
                                                             borderRadius: 12,
                                                         }}
                                                     >
-                                                        {sub.organization}
+                                                        {sub.userName}
                                                     </span>
                                                     <span
                                                         style={{
@@ -238,7 +255,7 @@ export default function SubscriptionDashboard() {
                                                             borderRadius: 12,
                                                         }}
                                                     >
-                                                        {new Date(sub.requestDate).toLocaleDateString(
+                                                        {new Date(sub.requestedDate).toLocaleDateString(
                                                             "en-US",
                                                             { month: "short", day: "numeric", year: "numeric" }
                                                         )}
@@ -251,7 +268,7 @@ export default function SubscriptionDashboard() {
                                                             borderRadius: 12,
                                                         }}
                                                     >
-                                                        {sub.department}
+                                                        {sub.userDepartment || 'N/A'}
                                                     </span>
                                                 </div>
                                             </td>

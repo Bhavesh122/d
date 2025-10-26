@@ -1,9 +1,9 @@
-package com.yourcompany.domainmanagement.service;
+package rwtool.adminpage.admin_domain.service;
 
-import com.yourcompany.domainmanagement.dto.ApprovalDecisionDTO;
-import com.yourcompany.domainmanagement.dto.SubscriptionRequestDTO;
-import com.yourcompany.domainmanagement.model.SubscriptionRequest;
-import com.yourcompany.domainmanagement.repository.SubscriptionRequestRepository;
+import rwtool.adminpage.admin_domain.dto.ApprovalDecisionDTO;
+import rwtool.adminpage.admin_domain.dto.SubscriptionRequestDTO;
+import rwtool.adminpage.admin_domain.model.SubscriptionRequest;
+import rwtool.adminpage.admin_domain.repository.SubscriptionRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

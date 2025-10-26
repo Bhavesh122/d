@@ -1,62 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./ApproveRejectSubscription.css";
-
-const AD_USERS = [
-  {
-    email: "bhavesh@gmail.com",
-    name: "Bhavesh",
-    department: "Finance",
-    adGroup: "Wealth Compliance",
-    title: "Financial Analyst"
-  },
-  {
-    email: "ram@gmail.com",
-    name: "Ram",
-    department: "Operations",
-    adGroup: "Wealth User Admin",
-    title: "Operations Manager"
-  },
-  {
-    email: "rahul@gmail.com",
-    name: "Rahul",
-    department: "Finance",
-    adGroup: "Wealth Compliance",
-    title: "Senior Accountant"
-  },
-  {
-    email: "priya@gmail.com",
-    name: "Priya",
-    department: "HR",
-    adGroup: "HR Analytics Group",
-    title: "HR Manager"
-  },
-  {
-    email: "john.doe@company.com",
-    name: "John Doe",
-    department: "Compliance",
-    adGroup: "Wealth Compliance",
-    title: "Compliance Officer"
-  },
-  {
-    email: "jane.smith@company.com",
-    name: "Jane Smith",
-    department: "Compliance",
-    adGroup: "Wealth Compliance",
-    title: "Senior Compliance Analyst"
-  },
-  {
-    email: "admin.user@company.com",
-    name: "Admin User",
-    department: "IT",
-    adGroup: "Wealth User Admin",
-    title: "System Administrator"
-  }
-];
-
-const getUserDepartment = (email) => {
-  const user = AD_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-  return user ? user.department : "Unknown";
-};
+import subscriptionService from "../../../services/subscriptionService";
 
 const ApproveRejectSubscription = () => {
     const [subscriptions, setSubscriptions] = useState([]);
@@ -67,58 +11,61 @@ const ApproveRejectSubscription = () => {
     const [rejectionReason, setRejectionReason] = useState("");
     const [otherReasonText, setOtherReasonText] = useState("");
     const [loadingAD, setLoadingAD] = useState(true);
+    const [notification, setNotification] = useState("");
 
     useEffect(() => {
-        setLoadingAD(true);
-        const dummyData = [
-            {
-                id: 1,
-                name: "Bhavesh",
-                email: "bhavesh@gmail.com",
-                domain: "Finance",
-                date: "15/01/2025",
-                status: "Pending",
-                requestReason: "I need access to Finance domain to generate quarterly financial reports and analyze budget allocations for my department."
-            },
-            {
-                id: 2,
-                name: "Ram",
-                email: "ram@gmail.com",
-                domain: "Investment",
-                date: "12/01/2025",
-                status: "Pending",
-                requestReason: "Required for managing investment portfolios and tracking asset performance metrics."
-            },
-            {
-                id: 3,
-                name: "Rahul",
-                email: "rahul@gmail.com",
-                domain: "Finance",
-                date: "14/01/2025",
-                status: "Pending",
-                requestReason: "Need to access financial statements and compliance reports for audit purposes."
-            },
-        ];
-
-        const subscriptionsWithAD = dummyData.map((sub) => {
-            const department = getUserDepartment(sub.email);
-            return {
-                ...sub,
-                actualDepartment: department,
-                departmentMatch: department.toLowerCase() === sub.domain.toLowerCase()
-            };
-        });
-
-        setSubscriptions(subscriptionsWithAD);
-        setLoadingAD(false);
+        fetchPendingRequests();
     }, []);
 
-    const handleApprove = (id) => {
-        setSubscriptions((prev) =>
-            prev.map((sub) =>
-                sub.id === id ? { ...sub, status: "Approved" } : sub
-            )
-        );
+    const fetchPendingRequests = async () => {
+        try {
+            setLoadingAD(true);
+            const data = await subscriptionService.getAllRequests();
+            
+            // Transform backend data to match component structure
+            const subscriptionsWithAD = data.map((sub) => {
+                // Use domain from user profile (userDepartment field contains the domain from profile)
+                const profileDomain = sub.userDepartment || 'Unknown';
+                return {
+                    id: sub.id,
+                    name: sub.userName,
+                    email: sub.userEmail,
+                    domain: sub.domainName,
+                    date: new Date(sub.requestedDate).toLocaleDateString(),
+                    reviewedDate: sub.reviewedDate ? new Date(sub.reviewedDate).toLocaleDateString() : null,
+                    status: sub.status,
+                    requestReason: sub.requestReason,
+                    rejectionReason: sub.rejectionReason,
+                    userDepartment: sub.userDepartment,
+                    userRole: sub.userRole,
+                    actualDepartment: profileDomain, // Show domain from user profile
+                    departmentMatch: profileDomain.toLowerCase() === sub.domainName.toLowerCase(),
+                    profileDomain: profileDomain
+                };
+            });
+
+            setSubscriptions(subscriptionsWithAD);
+        } catch (error) {
+            console.error('Error fetching subscription requests:', error);
+            setNotification('Error loading subscription requests');
+            setTimeout(() => setNotification(''), 3000);
+        } finally {
+            setLoadingAD(false);
+        }
+    };
+
+    const handleApprove = async (id) => {
+        try {
+            await subscriptionService.approveRequest(id);
+            setNotification('Subscription request approved successfully!');
+            setTimeout(() => setNotification(''), 3000);
+            // Refresh the list
+            await fetchPendingRequests();
+        } catch (error) {
+            console.error('Error approving request:', error);
+            setNotification('Error approving request');
+            setTimeout(() => setNotification(''), 3000);
+        }
     };
 
     const openRejectModal = (subscription) => {
@@ -138,7 +85,7 @@ const ApproveRejectSubscription = () => {
         setOtherReasonText("");
     };
 
-    const handleReject = () => {
+    const handleReject = async () => {
         const finalReason = rejectionReason === "Other" ? otherReasonText : rejectionReason;
         
         if (!finalReason.trim()) {
@@ -146,14 +93,18 @@ const ApproveRejectSubscription = () => {
             return;
         }
 
-        setSubscriptions((prev) =>
-            prev.map((sub) =>
-                sub.id === rejectingSubscription.id 
-                    ? { ...sub, status: "Rejected", rejectionReason: finalReason } 
-                    : sub
-            )
-        );
-        closeRejectModal();
+        try {
+            await subscriptionService.rejectRequest(rejectingSubscription.id, finalReason);
+            setNotification('Subscription request rejected');
+            setTimeout(() => setNotification(''), 3000);
+            closeRejectModal();
+            // Refresh the list
+            await fetchPendingRequests();
+        } catch (error) {
+            console.error('Error rejecting request:', error);
+            setNotification('Error rejecting request');
+            setTimeout(() => setNotification(''), 3000);
+        }
     };
 
     const filteredData = subscriptions.filter((sub) => {
@@ -162,14 +113,18 @@ const ApproveRejectSubscription = () => {
             sub.email.toLowerCase().includes(search.toLowerCase()) ||
             sub.domain.toLowerCase().includes(search.toLowerCase());
 
-        const matchFilter = filter === "All" ? true : sub.status === filter;
+        const matchFilter = filter === "All" ? true : sub.status.toUpperCase() === filter.toUpperCase();
         return matchSearch && matchFilter;
     });
 
-    const pendingCount = subscriptions.filter((s) => s.status === "Pending").length;
+    const pendingCount = subscriptions.filter((s) => s.status === "PENDING").length;
 
     return (
         <div className="ar-container">
+            {/* Notification */}
+            {notification && (
+                <div className="ar-notification">{notification}</div>
+            )}
             <div className="ar-top-header">
                 <div className="ar-header-left">
                     <h2 className="ar-title">Subscription Requests</h2>
@@ -210,11 +165,16 @@ const ApproveRejectSubscription = () => {
                     <div className="ar-loading">Loading AD information...</div>
                 )}
                 {!loadingAD && filteredData.map((sub) => (
-                    <div key={sub.id} className={`ar-subscription-card ${!sub.departmentMatch && sub.status === 'Pending' ? 'ar-mismatch' : ''}`}>
+                    <div key={sub.id} className={`ar-subscription-card ${!sub.departmentMatch && sub.status.toUpperCase() === 'PENDING' ? 'ar-mismatch' : ''}`}>
                         <div className="ar-sub-info">
                             <h5 className="ar-name">{sub.name}</h5>
                             <p className="ar-email">{sub.email}</p>
                             <p className="ar-date">Request Date: {sub.date}</p>
+                            {sub.reviewedDate && (
+                                <p className="ar-date" style={{color: '#6c757d'}}>
+                                    Reviewed Date: {sub.reviewedDate}
+                                </p>
+                            )}
                             
                             <div className="ar-domain-comparison">
                                 <div className="ar-domain-row">
@@ -222,7 +182,7 @@ const ApproveRejectSubscription = () => {
                                     <span className="ar-domain-value">{sub.domain}</span>
                                 </div>
                                 <div className="ar-domain-row">
-                                    <span className="ar-domain-label">Actual Department (AD):</span>
+                                    <span className="ar-domain-label">User Profile Domain:</span>
                                     <span className={`ar-domain-value ${sub.departmentMatch ? 'ar-match' : 'ar-no-match'}`}>
                                         {sub.actualDepartment}
                                         {sub.departmentMatch ? ' ✓' : ' ✗'}
@@ -237,13 +197,13 @@ const ApproveRejectSubscription = () => {
                                 </div>
                             )}
                             
-                            {!sub.departmentMatch && sub.status === 'Pending' && (
+                            {!sub.departmentMatch && sub.status.toUpperCase() === 'PENDING' && (
                                 <div className="ar-warning">
                                     ⚠️ Department mismatch detected
                                 </div>
                             )}
                             
-                            {sub.status === 'Rejected' && sub.rejectionReason && (
+                            {sub.status.toUpperCase() === 'REJECTED' && sub.rejectionReason && (
                                 <div className="ar-rejection-reason">
                                     <strong>Rejection Reason:</strong> {sub.rejectionReason}
                                 </div>
@@ -253,9 +213,9 @@ const ApproveRejectSubscription = () => {
                         <div className="ar-sub-actions">
                             <span
                                 className={`ar-status-badge ${
-                                    sub.status === "Pending"
+                                    sub.status.toUpperCase() === "PENDING"
                                         ? "ar-status-pending"
-                                        : sub.status === "Approved"
+                                        : sub.status.toUpperCase() === "APPROVED"
                                         ? "ar-status-approved"
                                         : "ar-status-rejected"
                                 }`}
@@ -263,7 +223,7 @@ const ApproveRejectSubscription = () => {
                                 {sub.status}
                             </span>
 
-                            {sub.status === "Pending" && (
+                            {sub.status.toUpperCase() === "PENDING" && (
                                 <div className="ar-btn-group">
                                     <button
                                         className="ar-action-btn ar-approve"

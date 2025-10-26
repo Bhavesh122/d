@@ -1,7 +1,7 @@
-package com.yourcompany.domainmanagement.service;
+package rwtool.adminpage.admin_domain.service;
 
-import com.yourcompany.domainmanagement.model.Domain;
-import com.yourcompany.domainmanagement.repository.DomainRepository;
+import rwtool.adminpage.admin_domain.model.Domain;
+import rwtool.adminpage.admin_domain.repository.DomainRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

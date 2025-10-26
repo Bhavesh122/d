@@ -1,6 +1,6 @@
-package com.yourcompany.domainmanagement.repository;
+package rwtool.adminpage.admin_domain.repository;
 
-import com.yourcompany.domainmanagement.model.Domain;
+import rwtool.adminpage.admin_domain.model.Domain;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

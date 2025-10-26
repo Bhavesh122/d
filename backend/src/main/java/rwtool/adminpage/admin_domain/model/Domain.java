@@ -1,4 +1,4 @@
-package com.yourcompany.domainmanagement.model;
+package rwtool.adminpage.admin_domain.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

@@ -1,27 +1,6 @@
 import { useState, useEffect } from "react";
 import "./UserGroupAccess.css";
-
-// Available domains data
-const DOMAINS = [
-  { 
-    id: "1", 
-    name: "Financial Reports", 
-    description: "All financial and accounting reports", 
-    createdDate: "2024-01-15" 
-  },
-  { 
-    id: "2", 
-    name: "Operations", 
-    description: "Operational metrics and performance reports", 
-    createdDate: "2024-02-20" 
-  },
-  { 
-    id: "3", 
-    name: "HR Analytics", 
-    description: "Human resources and workforce analytics", 
-    createdDate: "2024-03-10" 
-  }
-];
+import domainService from '../../../services/domainService';
 
 // Available folders for access control
 const AVAILABLE_FOLDERS = [
@@ -58,11 +37,26 @@ export const UserGroupAccess = () => {
   ]);
 
   const [availableDomains, setAvailableDomains] = useState([]);
+  const [loadingDomains, setLoadingDomains] = useState(true);
 
-  // Load domains from raw data
+  // Fetch domains from backend
   useEffect(() => {
-    setAvailableDomains(DOMAINS);
+    fetchDomains();
   }, []);
+
+  const fetchDomains = async () => {
+    try {
+      setLoadingDomains(true);
+      const domains = await domainService.getAllDomains();
+      setAvailableDomains(domains);
+    } catch (error) {
+      console.error('Error fetching domains:', error);
+      setNotification('Error loading domains');
+      setTimeout(() => setNotification(''), 3000);
+    } finally {
+      setLoadingDomains(false);
+    }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -294,14 +288,22 @@ export const UserGroupAccess = () => {
                 onChange={(e) =>
                   setFormData({ ...formData, associatedDomain: e.target.value })
                 }
+                disabled={loadingDomains}
               >
-                <option value="">-- Select Domain --</option>
+                <option value="">
+                  {loadingDomains ? "Loading domains..." : "-- Select Domain --"}
+                </option>
                 {availableDomains.map((domain) => (
                   <option key={domain.id} value={domain.name}>
                     {domain.name}
                   </option>
                 ))}
               </select>
+              {availableDomains.length === 0 && !loadingDomains && (
+                <p style={{color: '#dc3545', fontSize: '0.875rem', marginTop: '5px'}}>
+                  No domains available. Please add domains in Domain Management first.
+                </p>
+              )}
             </div>
 
             <div className="uga-form-section">

@@ -1,7 +1,7 @@
-package com.yourcompany.domainmanagement.controller;
+package rwtool.adminpage.admin_domain.controller;
 
-import com.yourcompany.domainmanagement.model.Domain;
-import com.yourcompany.domainmanagement.service.DomainService;
+import rwtool.adminpage.admin_domain.model.Domain;
+import rwtool.adminpage.admin_domain.service.DomainService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

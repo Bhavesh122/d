@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ApproveRejectSubscription from "../ApproveReject/ApproveRejectSubscription";
 import { DomainManagement } from "../DomainManagement/DomainManagement";
 import { FilePathManagement } from "../FilePathManagement/FilePathManagement";
@@ -6,11 +6,16 @@ import { UserGroupAccess } from "../UserGroupAccess/UserGroupAccess";
 import './Dashboard.css';
 import AuditLogs from "../AuditLog/AuditLogs";
 import AdminNotification from "../AdminNotification/AdminNotification";
-import { LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react';
+import subscriptionService from '../../../services/subscriptionService';
+import domainService from '../../../services/domainService';
 
 export default function Dashboard({ navigate }) {
     const [view, setView] = useState('dashboard');
     const [open, setOpen] = useState(true);
+    const [recentRequests, setRecentRequests] = useState([]);
+    const [recentDomains, setRecentDomains] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const logout = () => {
         navigate('landing'); // Redirect to landing page
@@ -26,11 +31,44 @@ export default function Dashboard({ navigate }) {
     ];
 
 
-    const requests = [
-        { id: 1, name: "Bhavesh", domain: "Finance", status: "Pending" },
-        { id: 2, name: "Ramesh", domain: "Cybersecurity", status: "Approved" },
-        { id: 3, name: "Suresh", domain: "Domain", status: "Pending" },
-    ];
+    // Fetch latest data from backend
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            // Fetch latest 3 subscription requests
+            const allRequests = await subscriptionService.getAllRequests();
+            const latest3Requests = allRequests
+                .sort((a, b) => new Date(b.requestedDate) - new Date(a.requestedDate))
+                .slice(0, 3)
+                .map(req => ({
+                    id: req.id,
+                    name: req.userName,
+                    domain: req.domainName,
+                    status: req.status
+                }));
+            setRecentRequests(latest3Requests);
+
+            // Fetch latest 3 domains
+            const allDomains = await domainService.getAllDomains();
+            const latest3Domains = allDomains
+                .sort((a, b) => new Date(b.createdDate || 0) - new Date(a.createdDate || 0))
+                .slice(0, 3)
+                .map(dom => ({
+                    name: dom.name,
+                    desc: dom.description,
+                    created: dom.createdDate ? new Date(dom.createdDate).toLocaleDateString() : 'N/A'
+                }));
+            setRecentDomains(latest3Domains);
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const nav = [
         { name: "Dashboard", icon: "", view: "dashboard" },
@@ -41,11 +79,6 @@ export default function Dashboard({ navigate }) {
         { name: "Logs", icon: "", view: "logs" }
     ];
 
-    const domains = [
-        { name: "Financial Reports", desc: "Financial and accounting report", created: "15/01/2024" },
-        { name: "Operation", desc: "Operational metric", created: "15/01/2024" },
-        { name: "Aabc", desc: "aabcd", created: "15/01/2024" }
-    ];
 
     const renderContent = () => {
         if (view == 'approve') return <ApproveRejectSubscription />;
@@ -75,15 +108,20 @@ export default function Dashboard({ navigate }) {
                     <table>
                         <thead><tr><th>User</th><th>Domain</th><th>Status</th></tr></thead>
                         <tbody>
-                            {requests.map(r => (
-                                <tr key={r.id}>
-                                    <td className="bold">{r.name}</td>
-                                    <td>{r.domain}</td>
-                                    <td><span className={`badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
-                                </tr>
-                            ))}
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentRequests.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No recent requests</td></tr>
+                            ) : (
+                                recentRequests.map(r => (
+                                    <tr key={r.id}>
+                                        <td className="bold">{r.name}</td>
+                                        <td>{r.domain}</td>
+                                        <td><span className={`badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
-
                     </table>
                 </div>
                 <div className="card">
@@ -95,15 +133,20 @@ export default function Dashboard({ navigate }) {
                     <table>
                         <thead><tr><th>Domain Name</th><th> Description </th><th>Created</th></tr></thead>
                         <tbody>
-                            {domains.map((d, i) => (
-                                <tr key={i}>
-                                    <td className="bold">{d.name}</td>
-                                    <td>{d.desc}</td>
-                                    <td>{d.created}</td>
-                                </tr>
-                            ))}
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentDomains.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No domains available</td></tr>
+                            ) : (
+                                recentDomains.map((d, i) => (
+                                    <tr key={i}>
+                                        <td className="bold">{d.name}</td>
+                                        <td>{d.desc}</td>
+                                        <td>{d.created}</td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
-
                     </table>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-package com.yourcompany.domainmanagement.dto;
+package rwtool.adminpage.admin_domain.dto;
 
 public class SubscriptionRequestDTO {
     private String domainId;
