@@ -14,7 +14,7 @@ const LandingPage = ({ navigate }) => {
         {
             id: 'admin',
             title: 'Admin',
-            description: 'Manage users, reports, and approvals.',
+            description: 'Manage users, reports, domain and approvals.',
             icon: Settings,
             color: '#0473EA',
             bgColor: 'rgba(4, 115, 234, 0.1)'
