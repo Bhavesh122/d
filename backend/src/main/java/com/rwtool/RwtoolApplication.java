@@ -1,11 +1,11 @@
-package rwtool.adminpage.admin_domain;
+package com.rwtool;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AdminDomainApplication {
+public class RwtoolApplication {
     public static void main(String[] args) {
-        SpringApplication.run(AdminDomainApplication.class, args);
+        SpringApplication.run(RwtoolApplication.class, args);
     }
 }

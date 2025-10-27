@@ -1,4 +1,4 @@
-package rwtool.adminpage.admin_domain.model;
+package com.rwtool.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

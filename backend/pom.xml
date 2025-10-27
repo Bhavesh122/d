@@ -12,11 +12,11 @@
         <relativePath/>
     </parent>
     
-    <groupId>rwtool.adminpage</groupId>
-    <artifactId>admin-domain</artifactId>
+    <groupId>com.rwtool</groupId>
+    <artifactId>rwtool</artifactId>
     <version>1.0.0</version>
-    <name>RW Tool Admin Domain API</name>
-    <description>Backend API for RW Tool Admin Domain Management</description>
+    <name>RW Tool API</name>
+    <description>Backend API for RW Tool</description>
     
     <properties>
         <java.version>17</java.version>
