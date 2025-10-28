@@ -33,7 +33,7 @@ export default function SubscriptionDashboard() {
         const matchesSearch =
             q === "" ||
             sub.domainName.toLowerCase().includes(q) ||
-            sub.userName.toLowerCase().includes(q);
+            (sub.rejectionReason && sub.rejectionReason.toLowerCase().includes(q));
         const matchesStatus =
             statusFilter === "All" ||
             sub.status.toLowerCase() === statusFilter.toLowerCase();
@@ -231,9 +231,6 @@ export default function SubscriptionDashboard() {
                                                 </div>
                                                 <div
                                                     style={{
-                                                        display: "flex",
-                                                        gap: 8,
-                                                        flexWrap: "wrap",
                                                         marginTop: 4,
                                                     }}
                                                 >
@@ -243,34 +240,34 @@ export default function SubscriptionDashboard() {
                                                             color: "#064A8E",
                                                             padding: "4px 8px",
                                                             borderRadius: 12,
+                                                            fontSize: 12,
                                                         }}
                                                     >
-                                                        {sub.userName}
-                                                    </span>
-                                                    <span
-                                                        style={{
-                                                            background: "#f6fbff",
-                                                            color: "#064A8E",
-                                                            padding: "4px 8px",
-                                                            borderRadius: 12,
-                                                        }}
-                                                    >
+                                                        <i className="bi bi-calendar3 me-1"></i>
                                                         {new Date(sub.requestedDate).toLocaleDateString(
                                                             "en-US",
                                                             { month: "short", day: "numeric", year: "numeric" }
                                                         )}
                                                     </span>
-                                                    <span
+                                                </div>
+                                                {sub.status.toLowerCase() === 'rejected' && sub.rejectionReason && (
+                                                    <div
                                                         style={{
-                                                            background: "#f6fbff",
-                                                            color: "#064A8E",
-                                                            padding: "4px 8px",
-                                                            borderRadius: 12,
+                                                            marginTop: 8,
+                                                            padding: "8px 12px",
+                                                            background: "#fee2e2",
+                                                            borderLeft: "3px solid #ef4444",
+                                                            borderRadius: 4,
                                                         }}
                                                     >
-                                                        {sub.userDepartment || 'N/A'}
-                                                    </span>
-                                                </div>
+                                                        <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 600, marginBottom: 2 }}>
+                                                            REJECTION REASON
+                                                        </div>
+                                                        <div style={{ fontSize: 13, color: "#dc2626" }}>
+                                                            {sub.rejectionReason}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </td>
                                             <td style={{ textAlign: "right" }}>
                                                 <StatusBadge status={sub.status} />

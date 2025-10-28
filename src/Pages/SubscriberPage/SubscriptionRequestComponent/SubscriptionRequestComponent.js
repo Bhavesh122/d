@@ -21,8 +21,6 @@ const SubscriptionRequestComponent = () => {
     const currentUser = {
         name: 'Tony Stark',
         email: 'tony3000@stark.com',
-        domain: 'Finance',
-        department: 'Engineering',
         role: 'Subscriber'
     };
 
@@ -89,7 +87,6 @@ const SubscriptionRequestComponent = () => {
                 requestReason: requestReason,
                 userName: currentUser.name,
                 userEmail: currentUser.email,
-                userDepartment: currentUser.domain, // Send domain from user profile
                 userRole: currentUser.role
             };
 
@@ -217,9 +214,15 @@ const SubscriptionRequestComponent = () => {
                                             <h5 className="domain-name mb-0">{d.name}</h5>
                                         </div>
                                         {d.status && (
-                                            <span className={`status-badge badge ${d.status === 'approved' ? 'bg-success' : 'bg-warning text-dark'}`}>
+                                            <span className={`status-badge badge ${
+                                                d.status === 'approved' ? 'bg-success' : 
+                                                d.status === 'rejected' ? 'bg-danger' : 
+                                                'bg-warning text-dark'
+                                            }`}>
                                                 {d.status === 'approved' ? (
                                                     <><i className="bi bi-check-circle me-1"></i>Approved</>
+                                                ) : d.status === 'rejected' ? (
+                                                    <><i className="bi bi-x-circle me-1"></i>Rejected</>
                                                 ) : (
                                                     <><i className="bi bi-clock me-1"></i>Pending</>
                                                 )}
@@ -254,17 +257,10 @@ const SubscriptionRequestComponent = () => {
                                                 </button>
                                             </div>
                                         ) : d.status === 'rejected' ? (
-                                            <div>
-                                                <button className="btn btn-danger w-100 mb-2" disabled>
-                                                    <i className="bi bi-x-circle me-2"></i>
-                                                    Request Rejected
-                                                </button>
-                                                {d.rejectionReason && (
-                                                    <small className="text-danger d-block">
-                                                        Reason: {d.rejectionReason}
-                                                    </small>
-                                                )}
-                                            </div>
+                                            <button className="btn btn-danger w-100" disabled>
+                                                <i className="bi bi-x-circle me-2"></i>
+                                                Request Rejected
+                                            </button>
                                         ) : (
                                             <button
                                                 className="btn btn-gradient w-100"
