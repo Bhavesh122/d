@@ -21,6 +21,7 @@ const SubscriptionRequestComponent = () => {
     const currentUser = {
         name: 'Tony Stark',
         email: 'tony3000@stark.com',
+        domain: 'Finance', // User's working domain (from profile)
         role: 'Subscriber'
     };
 
@@ -87,6 +88,7 @@ const SubscriptionRequestComponent = () => {
                 requestReason: requestReason,
                 userName: currentUser.name,
                 userEmail: currentUser.email,
+                userDepartment: currentUser.domain, // Send user's working domain
                 userRole: currentUser.role
             };
 
