@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Phone, Briefcase } from 'lucide-react';
 
 const SignupPage = ({ role, navigate }) => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
+        phone: '',
+        domain: '',
         password: '',
         confirmPassword: ''
     });
@@ -38,6 +39,14 @@ const SignupPage = ({ role, navigate }) => {
             newErrors.email = 'Email is required';
         } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
             newErrors.email = 'Email is invalid';
+        }
+        if (!formData.phone) {
+            newErrors.phone = 'Phone number is required';
+        } else if (!/^\d{10}$/.test(formData.phone.replace(/[\s-]/g, ''))) {
+            newErrors.phone = 'Phone number must be 10 digits';
+        }
+        if (role === 'user' && !formData.domain.trim()) {
+            newErrors.domain = 'Domain is required';
         }
         if (!formData.password) {
             newErrors.password = 'Password is required';
@@ -115,6 +124,48 @@ const SignupPage = ({ role, navigate }) => {
                         </div>
                         {errors.email && <span className="error-text">{errors.email}</span>}
                     </div>
+
+                    <div className="form-group">
+                        <label htmlFor="phone" className="form-label">Phone Number</label>
+                        <div className="input-wrapper">
+                            <Phone size={20} className="input-icon" />
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                className={`form-input ${errors.phone ? 'error' : ''}`}
+                                placeholder="1234567890"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                onKeyPress={handleKeyPress}
+                            />
+                        </div>
+                        {errors.phone && <span className="error-text">{errors.phone}</span>}
+                    </div>
+
+                    {role === 'user' && (
+                        <div className="form-group">
+                            <label htmlFor="domain" className="form-label">Domain/Industry</label>
+                            <div className="input-wrapper">
+                                <Briefcase size={20} className="input-icon" />
+                                <select
+                                    id="domain"
+                                    name="domain"
+                                    className={`form-input ${errors.domain ? 'error' : ''}`}
+                                    value={formData.domain}
+                                    onChange={handleChange}
+                                    style={{ paddingLeft: '45px' }}
+                                >
+                                    <option value="">Select your domain</option>
+                                    <option value="Technology">Technology</option>
+                                    <option value="Credit">Credit</option>
+                                    <option value="Finance">Finance</option>
+                                    <option value="Loan">Loan</option>
+                                </select>
+                            </div>
+                            {errors.domain && <span className="error-text">{errors.domain}</span>}
+                        </div>
+                    )}
 
                     <div className="form-group">
                         <label htmlFor="password" className="form-label">Password</label>
