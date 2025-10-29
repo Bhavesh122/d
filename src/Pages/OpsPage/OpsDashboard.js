@@ -230,6 +230,24 @@ const OpsDashboard = ({ navigate }) => {
     const [storageConnections] = useState(STORAGE);
     const [syncJobs, setSyncJobs] = useState(SYNC_JOBS);
     const [publishedReports, setPublishedReports] = useState(PUBLISHED);
+    const [storageFiles, setStorageFiles] = useState([]); // {name,size,modified}
+    const [importStatus, setImportStatus] = useState({}); // { [name]: 'idle'|'importing'|'success'|'error:msg' }
+
+    // Fetch storage list periodically
+    useEffect(() => {
+        const fetchStorage = async () => {
+            try {
+                const res = await fetch('http://localhost:8080/api/ops/storage');
+                const data = await res.json();
+                setStorageFiles(Array.isArray(data) ? data : []);
+            } catch (e) {
+                // ignore for demo
+            }
+        };
+        fetchStorage();
+        const id = setInterval(fetchStorage, 5000);
+        return () => clearInterval(id);
+    }, []);
 
     // Access control (US04) → compute allowed folders
     const allowedFolders = useMemo(() => {
@@ -239,12 +257,24 @@ const OpsDashboard = ({ navigate }) => {
         return sets;
     }, [user.adGroups]);
 
-    // Search domain = published + (optionally) all reports
-    const reportsDomain = useMemo(
-        () =>
-            ALL_REPORTS.filter((r) => allowedFolders.has(r.folder)), // enforce access (US04)
-        [allowedFolders]
-    );
+    // Map storage files to table rows
+    const extType = (name) => {
+        const n = (name || '').toLowerCase();
+        if (n.endsWith('.pdf')) return 'PDF';
+        if (n.endsWith('.xlsx') || n.endsWith('.xls')) return 'Excel';
+        if (n.endsWith('.zip')) return 'ZIP';
+        return 'TXT';
+    };
+
+    const reportsDomain = useMemo(() => {
+        return storageFiles.map((f, i) => ({
+            id: `s-${i}-${f.name}`,
+            name: f.name,
+            type: extType(f.name),
+            date: f.modified ? new Date(f.modified).toISOString() : new Date().toISOString(),
+            folder: 'Storage',
+        }));
+    }, [storageFiles]);
 
     const filteredReports = useMemo(() => {
         let rows = reportsDomain;
@@ -283,6 +313,22 @@ const OpsDashboard = ({ navigate }) => {
         setSelectedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
     const selectAllPage = () => setSelectedIds(pagedReports.map((r) => r.id));
     const clearSelection = () => setSelectedIds([]);
+
+    const importOne = async (name) => {
+        setImportStatus((s) => ({ ...s, [name]: 'importing' }));
+        try {
+            const res = await fetch(`http://localhost:8080/api/ops/import-storage?fileName=${encodeURIComponent(name)}`, { method: 'POST' });
+            const data = await res.json();
+            if (data && data.imported) {
+                setImportStatus((s) => ({ ...s, [name]: 'success' }));
+            } else {
+                const reason = data && data.reason ? data.reason : 'failed';
+                setImportStatus((s) => ({ ...s, [name]: `error:${reason}` }));
+            }
+        } catch (e) {
+            setImportStatus((s) => ({ ...s, [name]: `error:${e.message}` }));
+        }
+    };
 
     const batchDownload = () => {
         // Simulate: in real app, request ZIP for selected items & dates (US06)
@@ -683,16 +729,40 @@ const OpsDashboard = ({ navigate }) => {
 
                                                     <td className="muted-td col-type">{r.type}</td>
                                                     <td className="muted-td col-date">{new Date(r.date).toLocaleString()}</td>
+                                                    <td className="muted-td">
+                                                        {(() => {
+                                                            const st = importStatus[r.name] || 'idle';
+                                                            const isImporting = st === 'importing';
+                                                            const isSuccess = st === 'success';
+                                                            const isError = st.startsWith && st.startsWith('error:');
+                                                            return (
+                                                                <>
+                                                                    {isSuccess && <span className="status-badge success">Success</span>}
+                                                                    {isError && <span className="status-badge failure">Failure</span>}
+                                                                    {isImporting && <span className="status-badge">Importing…</span>}
+                                                                    {!isImporting && !isSuccess && !isError && <span className="status-badge">Pending</span>}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </td>
                                                     <td className="row-8 col-actions">
-                                                        <button
-                                                            className="approve-btn"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                alert('Importing...');
-                                                            }}
-                                                        >
-                                                            <Download size={14} /> Import
-                                                        </button>
+                                                        {(() => {
+                                                            const st = importStatus[r.name] || 'idle';
+                                                            const isImporting = st === 'importing';
+                                                            const isSuccess = st === 'success';
+                                                            return (
+                                                                <button
+                                                                    className={`approve-btn ${isSuccess ? 'success' : ''}`}
+                                                                    disabled={isImporting || isSuccess}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (!isSuccess) importOne(r.name);
+                                                                    }}
+                                                                >
+                                                                    {isSuccess ? 'Imported' : (<><Download size={14} /> Import</>)}
+                                                                </button>
+                                                            );
+                                                        })()}
                                                     </td>
                                                     <td className="muted-td col-downloads">{r.downloads}</td>
                                                 </tr>
