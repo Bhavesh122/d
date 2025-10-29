@@ -18,6 +18,9 @@ public class SubscriptionRequestService {
 
     @Autowired
     private SubscriptionRequestRepository subscriptionRequestRepository;
+    
+    @Autowired
+    private UserGroupService userGroupService;
 
     public List<SubscriptionRequest> getAllRequests() {
         return subscriptionRequestRepository.findAll();
@@ -88,6 +91,14 @@ public class SubscriptionRequestService {
         request.setStatus("APPROVED");
         request.setReviewedDate(LocalDateTime.now());
         request.setRejectionReason(null);
+
+        // Auto-add user to the domain's user group
+        try {
+            userGroupService.addUserToGroupByDomain(request.getUserEmail(), request.getDomainName());
+        } catch (Exception e) {
+            // Log error but don't fail the approval
+            System.err.println("Failed to add user to group: " + e.getMessage());
+        }
 
         return subscriptionRequestRepository.save(request);
     }

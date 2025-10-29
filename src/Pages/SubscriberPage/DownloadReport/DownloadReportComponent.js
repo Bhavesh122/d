@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './DownloadReport.css';
 import { useNavigate, Routes, Route } from 'react-router-dom';
+import folderService from '../../../services/folderService';
 
 import PDFViewer from '../PDFViewer/PDFViewer';
 const PDF_FILE = "Database_Fundamentals.pdf";
@@ -10,20 +11,57 @@ const DownloadReportComponent = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [selectedReport, setSelectedReport] = useState(null);
-    const [selectedFile,setSelectedFile] = useState(null);
+    const [selectedFile, setSelectedFile] = useState(null);
     const [showFavorites, setShowFavorites] = useState(false);
     const [selectedReports, setSelectedReports] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [domains, setDomains] = useState([]);
 
-    const [reports, setReports] = useState([
-        { id: 1, title: 'Q4 2024 Financial Report', description: 'Comprehensive quarterly financial statements, P&L analysis, and balance sheet review', domain: 'Finance', publishedDate: '15 Dec 2024', version: 'v1.2', favorite: false },
-        { id: 2, title: 'Risk Exposure Summary', description: 'Value at Risk (VaR), stress testing results, and compliance reporting metrics', domain: 'Risk Management', publishedDate: '18 Dec 2024', version: 'v2.0', favorite: false },
-        { id: 3, title: 'Trading Performance Report', description: 'Trade blotter analysis, position tracking, and performance analytics dashboard', domain: 'Trading', publishedDate: '10 Dec 2024', version: 'v1.0', favorite: false },
-        { id: 4, title: 'HR Analytics Monthly', description: 'Workforce metrics, hiring funnel analysis, retention and employee engagement data', domain: 'HR Analytics', publishedDate: '20 Dec 2024', version: 'v1.1', favorite: false },
-        { id: 5, title: 'Operations KPI Dashboard', description: 'Process efficiency metrics, throughput analysis, SLA compliance, and incident tracking', domain: 'Operations', publishedDate: '22 Dec 2024', version: 'v2.1', favorite: false },
-        { id: 6, title: 'Compliance Audit Report', description: 'Audit trails, policy adherence tracking, and regulatory submission documentation', domain: 'Compliance', publishedDate: '12 Dec 2024', version: 'v1.0', favorite: false }
-    ]);
+    // TODO: Replace with actual user from auth context
+    const currentUser = {
+        name: 'Tony Stark',
+        email: 'tony3000@stark.com',
+        role: 'Subscriber'
+    };
 
-    const domains = ['Finance', 'Risk Management', 'Trading', 'HR Analytics', 'Operations', 'Compliance'];
+    // Fetch user's accessible files on component mount
+    useEffect(() => {
+        fetchUserFiles();
+    }, []);
+
+    const fetchUserFiles = async () => {
+        try {
+            setLoading(true);
+            const files = await folderService.getUserAccessibleFiles(currentUser.email);
+            
+            // Transform files to reports format
+            const transformedReports = files.map((file, index) => ({
+                id: index + 1,
+                title: file.name,
+                description: `File from ${file.folder} folder`,
+                domain: file.folder,
+                publishedDate: file.modified ? new Date(file.modified).toLocaleDateString() : 'N/A',
+                version: 'v1.0',
+                favorite: false,
+                size: file.size,
+                fileName: file.name,
+                folderPath: file.folder
+            }));
+            
+            setReports(transformedReports);
+            
+            // Extract unique domains (folders)
+            const uniqueDomains = [...new Set(files.map(f => f.folder))].sort();
+            setDomains(uniqueDomains);
+        } catch (error) {
+            console.error('Error fetching user files:', error);
+            setReports([]);
+            setDomains([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredReports = reports.filter(r => {
         const search = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.domain.toLowerCase().includes(searchQuery.toLowerCase());
@@ -38,10 +76,12 @@ const DownloadReportComponent = () => {
 
     const getFavoritesCount = () => reports.filter(r => r.favorite).length;
 
-    const handleDownload = (url) => {
+    const handleDownload = (report) => {
+        // Download file from backend
+        const downloadUrl = `http://localhost:8080/api/files/download?folder=${encodeURIComponent(report.folderPath)}&fileName=${encodeURIComponent(report.fileName)}`;
         const link = document.createElement("a");
-        link.href = url;
-        link.download = url.split("/").pop();
+        link.href = downloadUrl;
+        link.download = report.fileName;
         link.click();
     };
 
@@ -60,12 +100,11 @@ const DownloadReportComponent = () => {
     };
 
     const handleDownloadSelected = () => {
-        
         // Download each selected report
         selectedReports.forEach(id => {
             const report = reports.find(r => r.id === id);
             if (report) {
-                handleDownload(PDF_FILE);
+                handleDownload(report);
             }
         });
         // Clear selections after download
@@ -143,7 +182,14 @@ const DownloadReportComponent = () => {
             </div>
 
             {/* Reports */}
-            {filteredReports.length > 0 ? (
+            {loading ? (
+                <div className="text-center py-5">
+                    <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-3 text-muted">Loading your accessible files...</p>
+                </div>
+            ) : filteredReports.length > 0 ? (
                 <div className="row g-4">
                     {filteredReports.map(r => (
                         <div key={r.id} className="col-12">
@@ -188,10 +234,10 @@ const DownloadReportComponent = () => {
                                                 ))}
                                             </div>
                                             <div className="d-flex gap-3 flex-wrap">
-                                                <button className="btn btn-download" onClick={() => handleDownload(PDF_FILE)}>
+                                                <button className="btn btn-download" onClick={() => handleDownload(r)}>
                                                     <i className="bi bi-download me-2"></i>Download Report
                                                 </button>
-                                                <button className="btn btn-preview-new" onClick={() => setSelectedFile(PDF_FILE)}>
+                                                <button className="btn btn-preview-new" onClick={() => setSelectedFile(r.fileName)}>
                                                     <i className="bi bi-eye me-2"></i>Preview Report
                                                 </button>
                                             </div>

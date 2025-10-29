@@ -1,47 +1,22 @@
 import { useState, useEffect } from "react";
 import "./UserGroupAccess.css";
 import domainService from '../../../services/domainService';
-
-// Available folders for access control
-const AVAILABLE_FOLDERS = [
-  "SCB",
-  "AML",
-  "AML/General",
-  "Credit Admin",
-  "Credit Admin/Credit Risk",
-  "Compliance",
-  "Finance Department",
-  "Operations",
-  "Treasury",
-  "Investment Banking"
-];
+import userGroupService from '../../../services/userGroupService';
+import folderService from '../../../services/folderService';
 
 export const UserGroupAccess = () => {
-  const [userGroups, setUserGroups] = useState([
-    { 
-      id: "1", 
-      adGroupName: "Wealth Compliance", 
-      folderAccess: ["Compliance", "AML/General"],
-      associatedDomain: "Financial Reports",
-      users: ["john.doe@company.com", "jane.smith@company.com"],
-      createdDate: "2024-01-15" 
-    },
-    { 
-      id: "2", 
-      adGroupName: "Wealth User Admin", 
-      folderAccess: ["Operations", "Finance Department"],
-      associatedDomain: "Operations",
-      users: ["admin.user@company.com"],
-      createdDate: "2024-02-20" 
-    }
-  ]);
-
+  const [userGroups, setUserGroups] = useState([]);
   const [availableDomains, setAvailableDomains] = useState([]);
+  const [availableFolders, setAvailableFolders] = useState([]);
   const [loadingDomains, setLoadingDomains] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [loadingFolders, setLoadingFolders] = useState(true);
 
-  // Fetch domains from backend
+  // Fetch all data on component mount
   useEffect(() => {
     fetchDomains();
+    fetchUserGroups();
+    fetchFolders();
   }, []);
 
   const fetchDomains = async () => {
@@ -55,6 +30,34 @@ export const UserGroupAccess = () => {
       setTimeout(() => setNotification(''), 3000);
     } finally {
       setLoadingDomains(false);
+    }
+  };
+
+  const fetchUserGroups = async () => {
+    try {
+      setLoadingGroups(true);
+      const groups = await userGroupService.getAllGroups();
+      setUserGroups(groups);
+    } catch (error) {
+      console.error('Error fetching user groups:', error);
+      setNotification('Error loading user groups');
+      setTimeout(() => setNotification(''), 3000);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const fetchFolders = async () => {
+    try {
+      setLoadingFolders(true);
+      const folders = await folderService.listReportFolders();
+      setAvailableFolders(folders);
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+      setNotification('Error loading folders');
+      setTimeout(() => setNotification(''), 3000);
+    } finally {
+      setLoadingFolders(false);
     }
   };
 
@@ -77,10 +80,10 @@ export const UserGroupAccess = () => {
     setFormData(
       group 
         ? { 
-            adGroupName: group.adGroupName, 
-            folderAccess: [...group.folderAccess],
+            adGroupName: group.adGroupName || "", 
+            folderAccess: group.folderAccess ? [...group.folderAccess] : [],
             associatedDomain: group.associatedDomain || "",
-            users: [...group.users]
+            users: group.members ? [...group.members] : (group.users ? [...group.users] : [])
           } 
         : { adGroupName: "", folderAccess: [], associatedDomain: "", users: [] }
     );
@@ -103,55 +106,37 @@ export const UserGroupAccess = () => {
     }));
   };
 
-  const saveGroup = () => {
+  const saveGroup = async () => {
     if (!formData.adGroupName.trim() || formData.folderAccess.length === 0 || !formData.associatedDomain.trim()) {
       setNotification("AD Group Name, at least one Folder, and Associated Domain are required");
       setTimeout(() => setNotification(""), 2000);
       return;
     }
 
-    const isDuplicate = userGroups.some(
-      (g) => 
-        g.adGroupName.toLowerCase() === formData.adGroupName.trim().toLowerCase() && 
-        g.id !== editingGroup?.id
-    );
-    
-    if (isDuplicate) {
-      setNotification("AD Group Name already exists");
-      setTimeout(() => setNotification(""), 2000);
-      return;
-    }
-
-    if (editingGroup) {
-      setUserGroups(
-        userGroups.map(g => 
-          g.id === editingGroup.id 
-            ? { 
-                ...g, 
-                adGroupName: formData.adGroupName, 
-                folderAccess: formData.folderAccess,
-                associatedDomain: formData.associatedDomain,
-                users: formData.users
-              } 
-            : g
-        )
-      );
-      setNotification("User group updated successfully");
-    } else {
-      const newGroup = {
-        id: Date.now().toString(),
+    try {
+      const groupData = {
         adGroupName: formData.adGroupName,
         folderAccess: formData.folderAccess,
         associatedDomain: formData.associatedDomain,
-        users: formData.users,
-        createdDate: new Date().toISOString().split("T")[0]
+        members: formData.users || []
       };
-      setUserGroups([...userGroups, newGroup]);
-      setNotification("User group created successfully");
-    }
 
-    closeModal();
-    setTimeout(() => setNotification(""), 3000);
+      if (editingGroup) {
+        await userGroupService.updateGroup(editingGroup.id, groupData);
+        setNotification("User group updated successfully");
+      } else {
+        await userGroupService.createGroup(groupData);
+        setNotification("User group created successfully");
+      }
+
+      closeModal();
+      await fetchUserGroups(); // Refresh the list
+      setTimeout(() => setNotification(""), 3000);
+    } catch (error) {
+      console.error('Error saving user group:', error);
+      setNotification(error.message || 'Error saving user group');
+      setTimeout(() => setNotification(""), 3000);
+    }
   };
 
   const openDeleteConfirm = (groupId) => {
@@ -164,18 +149,24 @@ export const UserGroupAccess = () => {
     setDeleteGroupId(null);
   };
 
-  const deleteGroup = () => {
-    setUserGroups(userGroups.filter(g => g.id !== deleteGroupId));
-    setNotification("User group deleted successfully");
-    closeDeleteConfirm();
-    setTimeout(() => setNotification(""), 3000);
+  const deleteGroup = async () => {
+    try {
+      await userGroupService.deleteGroup(deleteGroupId);
+      setNotification("User group deleted successfully");
+      closeDeleteConfirm();
+      await fetchUserGroups(); // Refresh the list
+      setTimeout(() => setNotification(""), 3000);
+    } catch (error) {
+      console.error('Error deleting user group:', error);
+      setNotification('Error deleting user group');
+      setTimeout(() => setNotification(""), 3000);
+    }
   };
 
   const filteredGroups = userGroups.filter(
     (g) =>
       g.adGroupName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.folderAccess.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.reportAccess.some(r => r.toLowerCase().includes(searchTerm.toLowerCase()))
+      (g.folderAccess && g.folderAccess.some(f => f.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   return (
@@ -207,7 +198,9 @@ export const UserGroupAccess = () => {
 
       {/* Cards Grid */}
       <div className="uga-grid">
-        {filteredGroups.length === 0 ? (
+        {loadingGroups ? (
+          <div className="uga-no-data">Loading user groups...</div>
+        ) : filteredGroups.length === 0 ? (
           <div className="uga-no-data">No user groups found</div>
         ) : (
           filteredGroups.map((group) => (
@@ -236,18 +229,18 @@ export const UserGroupAccess = () => {
                 <div className="uga-stats-row">
                   <div className="uga-stat">
                     <span className="uga-stat-icon">👥</span>
-                    <span className="uga-stat-value">{group.users.length} Members</span>
+                    <span className="uga-stat-value">{(group.members || group.users || []).length} Members</span>
                   </div>
                   <div className="uga-stat">
                     <span className="uga-stat-icon">📁</span>
-                    <span className="uga-stat-value">{group.folderAccess.length} Folders</span>
+                    <span className="uga-stat-value">{(group.folderAccess || []).length} Folders</span>
                   </div>
                 </div>
                 
                 <div className="uga-info-section">
                   <span className="uga-section-label">FOLDER ACCESS:</span>
                   <div className="uga-folder-tags">
-                    {group.folderAccess.map((folder, idx) => (
+                    {(group.folderAccess || []).map((folder, idx) => (
                       <span key={idx} className="uga-folder-tag">{folder}</span>
                     ))}
                   </div>
@@ -308,9 +301,9 @@ export const UserGroupAccess = () => {
 
             <div className="uga-form-section">
               <label className="uga-form-label">Folder Access *</label>
-              <p className="uga-form-sublabel">Select folders this group can access</p>
+              <p className="uga-form-sublabel">Select folders this group can access (from reports directory)</p>
               <div className="uga-folder-grid">
-                {AVAILABLE_FOLDERS.map((folder) => (
+                {availableFolders.map((folder) => (
                   <label key={folder} className="uga-folder-checkbox">
                     <input
                       type="checkbox"
