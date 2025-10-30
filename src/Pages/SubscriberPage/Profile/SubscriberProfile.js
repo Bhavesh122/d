@@ -21,6 +21,10 @@ const SubscriberProfile = ({ userEmail }) => {
                         domain: user.domain || ''
                     });
                 }
+            } catch (e) {
+                if (mounted) {
+                    setData(prev => ({ ...prev, email: userEmail }));
+                }
             } finally {
                 if (mounted) setLoading(false);
             }
