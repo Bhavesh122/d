@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SubscriptionRequestComponent from '../SubscriptionRequestComponent/SubscriptionRequestComponent';
 import DownloadReportComponent from '../DownloadReport/DownloadReportComponent';
 import SubscriptionDashboard from '../SubscriptionStatusPage/SubsciptionDashboard';
@@ -8,30 +7,47 @@ import SubscriberProfile from '../Profile/SubscriberProfile';
 import { LogOut } from 'lucide-react';
 import '../../AdminPage/AdminDashBoard/Dashboard.css';
 import './SubscriberDashboard.css';
+import subscriptionService from '../../../services/subscriptionService';
+import folderService from '../../../services/folderService';
 
 const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     const [view, setView] = useState('dashboard');
     const [open, setOpen] = useState(true);
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const logout = () => {
         navigateToPage('landing');
     };
 
     const user = { name: 'Tony Stark', email: 'tony3000@stark.com', role: 'Subscriber' };
-
-    const [subscriptions] = useState([
-        { id: 1, domain: 'Equities', status: 'APPROVED', requestedAt: '2024-12-01', approvedAt: '2024-12-02' },
-        { id: 2, domain: 'FX', status: 'APPROVED', requestedAt: '2024-12-05', approvedAt: '2024-12-06' },
-        { id: 3, domain: 'Commodities', status: 'PENDING', requestedAt: '2024-12-15', approvedAt: null },
-        { id: 4, domain: 'Fixed Income', status: 'REJECTED', requestedAt: '2024-11-20', approvedAt: '2024-11-22' }
-    ]);
-
-    const [reports] = useState([
-        { id: 1, title: 'Q4 2024 Equities Market Analysis', domain: 'Equities', publishedAt: '2024-12-15', version: 'v1.2', format: 'PDF', size: '2.4 MB', downloads: 145 },
-        { id: 2, title: 'FX Trading Weekly Summary', domain: 'FX', publishedAt: '2024-12-18', version: 'v2.0', format: 'XLSX', size: '856 KB', downloads: 98 },
-        { id: 3, title: 'Global Equities Performance Review', domain: 'Equities', publishedAt: '2024-12-20', version: 'v1.1', format: 'PDF', size: '1.8 MB', downloads: 312 },
-        { id: 4, title: 'FX Volatility Index Analysis', domain: 'FX', publishedAt: '2024-12-22', version: 'v1.0', format: 'CSV', size: '645 KB', downloads: 87 }
-    ]);
+    
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoading(true);
+                // fetch subscriptions for user
+                const subs = await subscriptionService.getRequestsByUser(user.email);
+                setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
+                // fetch accessible files for user
+                const files = await folderService.getUserAccessibleFiles(user.email);
+                // normalize to match the minimal fields we show in the dashboard table
+                const normalized = (files || []).map((f, idx) => ({
+                    id: idx + 1,
+                    title: f.name,
+                    domain: f.folder
+                }));
+                setReports(normalized);
+            } catch (e) {
+                setSubscriptions([]);
+                setReports([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
 
     const approvedDomains = subscriptions.filter(s => s.status === 'APPROVED').map(s => s.domain);
     const filteredReports = reports.filter(r => approvedDomains.includes(r.domain));
@@ -55,7 +71,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 <h1>Dashboard</h1>
                 <p className="subtitle">Welcome back, {user.name}</p>
                 <div className="stats">
-                    <div className="card"><div><p className="label">Active Subscriptions</p><h2>{subscriptions.filter(s => s.status === 'APPROVED').length}</h2></div></div>
+                    <div className="card"><div><p className="label">Active Subscriptions</p><h2>{approvedDomains.length}</h2></div></div>
                     <div className="card"><div><p className="label">Pending Requests</p><h2>{subscriptions.filter(s => s.status === 'PENDING').length}</h2></div></div>
                     <div className="card"><div><p className="label">Available Reports</p><h2>{filteredReports.length}</h2></div></div>
                     <div className="card"><div><p className="label">Rejected Requests</p><h2>{subscriptions.filter(s => s.status === 'REJECTED').length}</h2></div></div>
@@ -69,7 +85,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                         <table>
                             <thead><tr><th>Domain</th><th>Status</th></tr></thead>
                             <tbody>
-                                {subscriptions.slice(0, 5).map(s => (
+                                {(subscriptions || []).slice(0, 5).map(s => (
                                     <tr key={s.id}><td className="bold">{s.domain}</td><td><span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span></td></tr>
                                 ))}
                             </tbody>
@@ -83,7 +99,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                         <table>
                             <thead><tr><th>Title</th><th>Domain</th></tr></thead>
                             <tbody>
-                                {filteredReports.slice(0, 5).map(r => (
+                                {(filteredReports || []).slice(0, 5).map(r => (
                                     <tr key={r.id}><td className="bold">{r.title}</td><td>{r.domain}</td></tr>
                                 ))}
                             </tbody>
