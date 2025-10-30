@@ -57,6 +57,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Allow authentication endpoints
                 .requestMatchers("/api/**").permitAll() // Allow all API endpoints for now (domains, subscriptions)
+                .requestMatchers("/reports/**").permitAll() // Allow report preview endpoints
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll() // Allow Swagger
                 .anyRequest().permitAll() // Allow everything else for development
             )

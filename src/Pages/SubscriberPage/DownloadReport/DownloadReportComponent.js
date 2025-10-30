@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import './DownloadReport.css';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import folderService from '../../../services/folderService';
+import reportService from '../../../services/reportService';
 
 import PDFViewer from '../PDFViewer/PDFViewer';
-const PDF_FILE = "Database_Fundamentals.pdf";
 
 const DownloadReportComponent = () => {
     const navigate = useNavigate();
@@ -17,6 +17,7 @@ const DownloadReportComponent = () => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [domains, setDomains] = useState([]);
+    const [statusMsg, setStatusMsg] = useState('');
 
     // TODO: Replace with actual user from auth context
     const currentUser = {
@@ -111,7 +112,51 @@ const DownloadReportComponent = () => {
         setSelectedReports([]);
     };
 
-    if(selectedFile) return <PDFViewer fileName={selectedFile} onBack={() => setSelectedFile(null)} />;
+    const handlePreviewReport = async (report) => {
+        setStatusMsg("");
+        try {
+            const userId = currentUser?.email || "subscriber-demo";
+            const data = await reportService.presignView(
+                report.id.toString(),
+                userId,
+                report.folderPath,
+                report.fileName
+            );
+
+            if (!data) {
+                setStatusMsg("Preview not available.");
+                return;
+            }
+            if (data.message && !data.url) {
+                setStatusMsg(data.message);
+                return;
+            }
+            if (!data.url) {
+                setStatusMsg("No URL received for preview.");
+                return;
+            }
+
+            setSelectedFile({
+                fileName: report.fileName,
+                displayName: report.title,
+                presignedUrl: data.url,
+                reportId: report.id
+            });
+        } catch (error) {
+            console.error("Preview error:", error);
+            setStatusMsg("Failed to preview report. Please try again.");
+        }
+    };
+
+    if(selectedFile) {
+        return (
+            <PDFViewer 
+                displayName={selectedFile.displayName}
+                presignedUrl={selectedFile.presignedUrl}
+                onBack={() => setSelectedFile(null)} 
+            />
+        );
+    }
 
     return (
         <div className="download-report-container">
@@ -181,6 +226,14 @@ const DownloadReportComponent = () => {
                 </div>
             </div>
 
+            {/* Status Message */}
+            {statusMsg && (
+                <div className="alert alert-info alert-dismissible fade show" role="alert">
+                    {statusMsg}
+                    <button type="button" className="btn-close" onClick={() => setStatusMsg('')}></button>
+                </div>
+            )}
+
             {/* Reports */}
             {loading ? (
                 <div className="text-center py-5">
@@ -237,7 +290,7 @@ const DownloadReportComponent = () => {
                                                 <button className="btn btn-download" onClick={() => handleDownload(r)}>
                                                     <i className="bi bi-download me-2"></i>Download Report
                                                 </button>
-                                                <button className="btn btn-preview-new" onClick={() => setSelectedFile(r.fileName)}>
+                                                <button className="btn btn-preview-new" onClick={() => handlePreviewReport(r)}>
                                                     <i className="bi bi-eye me-2"></i>Preview Report
                                                 </button>
                                             </div>

@@ -22,6 +22,7 @@ public class CorsConfig {
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         
         source.registerCorsConfiguration("/api/**", config);
+        source.registerCorsConfiguration("/reports/**", config);
         return new CorsFilter(source);
     }
 }
