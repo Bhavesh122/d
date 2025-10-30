@@ -100,16 +100,38 @@ const DownloadReportComponent = () => {
         }
     };
 
-    const handleDownloadSelected = () => {
-        // Download each selected report
-        selectedReports.forEach(id => {
-            const report = reports.find(r => r.id === id);
-            if (report) {
-                handleDownload(report);
+    const handleDownloadSelected = async () => {
+        try {
+            if (selectedReports.length === 0) return;
+            if (selectedReports.length === 1) {
+                const single = reports.find(r => r.id === selectedReports[0]);
+                if (single) handleDownload(single);
+                setSelectedReports([]);
+                return;
             }
-        });
-        // Clear selections after download
-        setSelectedReports([]);
+
+            const files = selectedReports
+                .map(id => reports.find(r => r.id === id))
+                .filter(Boolean)
+                .map(r => ({ folder: r.folderPath, fileName: r.fileName }));
+
+            setStatusMsg("Preparing ZIP for selected reports...");
+            const blob = await reportService.downloadBatch(files, "selected_reports.zip");
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'selected_reports.zip';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            setStatusMsg("");
+        } catch (e) {
+            console.error('Batch download error:', e);
+            setStatusMsg('Failed to download selected reports.');
+        } finally {
+            setSelectedReports([]);
+        }
     };
 
     const handlePreviewReport = async (report) => {

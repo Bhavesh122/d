@@ -29,6 +29,23 @@ const reportService = {
       console.error("Error in presignView:", error);
       throw error;
     }
+  },
+
+  /**
+   * Download multiple files as a ZIP
+   * @param {Array<{folder:string,fileName:string}>} files
+   * @param {string} zipName
+   * @returns {Blob} zip Blob
+   */
+  downloadBatch: async (files, zipName = "reports.zip") => {
+    const res = await fetch(`${API_BASE_URL}/api/files/download/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files, zipName })
+    });
+    if (!res.ok) throw new Error("Failed to download selected reports");
+    const blob = await res.blob();
+    return blob;
   }
 };
 
