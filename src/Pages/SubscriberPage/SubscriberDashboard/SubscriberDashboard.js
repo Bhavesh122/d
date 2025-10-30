@@ -56,7 +56,10 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         load();
     }, []);
 
-    const approvedDomains = subscriptions.filter(s => s.status === 'APPROVED').map(s => s.domain);
+    const approvedDomains = subscriptions
+        .filter(s => (s.status || '').toUpperCase() === 'APPROVED')
+        .map(s => s.domain || s.domainName || s.folder || s.category)
+        .filter(Boolean);
     const filteredReports = reports.filter(r => approvedDomains.includes(r.domain));
 
     const nav = [
@@ -80,7 +83,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 <div className="stats">
                     <div className="card"><div><p className="label">Active Subscriptions</p><h2>{approvedDomains.length}</h2></div></div>
                     <div className="card"><div><p className="label">Pending Requests</p><h2>{subscriptions.filter(s => s.status === 'PENDING').length}</h2></div></div>
-                    <div className="card"><div><p className="label">Available Reports</p><h2>{filteredReports.length}</h2></div></div>
+                    <div className="card"><div><p className="label">Available Reports</p><h2>{reports.length}</h2></div></div>
                     <div className="card"><div><p className="label">Rejected Requests</p><h2>{subscriptions.filter(s => s.status === 'REJECTED').length}</h2></div></div>
                 </div>
                 <div className="grid">
@@ -92,9 +95,13 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                         <table>
                             <thead><tr><th>Domain</th><th>Status</th></tr></thead>
                             <tbody>
-                                {(subscriptions || []).slice(0, 5).map(s => (
-                                    <tr key={s.id}><td className="bold">{s.domain}</td><td><span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span></td></tr>
-                                ))}
+                                {(subscriptions || []).slice(0, 5).map(s => {
+                                    const dom = s.domain || s.domainName || s.folder || s.category || '—';
+                                    const status = (s.status || '').toString();
+                                    return (
+                                        <tr key={s.id}><td className="bold">{dom}</td><td><span className={`badge ${status.toLowerCase()}`}>{status}</span></td></tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -106,7 +113,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                         <table>
                             <thead><tr><th>Title</th><th>Domain</th></tr></thead>
                             <tbody>
-                                {(filteredReports || []).slice(0, 5).map(r => (
+                                {(reports || []).slice(0, 5).map(r => (
                                     <tr key={r.id}><td className="bold">{r.title}</td><td>{r.domain}</td></tr>
                                 ))}
                             </tbody>
