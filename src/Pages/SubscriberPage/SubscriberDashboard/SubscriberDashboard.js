@@ -23,16 +23,23 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     };
 
     const user = { name: 'Tony Stark', email: 'tony3000@stark.com', role: 'Subscriber' };
+    const urlEmail = (() => {
+        try { return new URLSearchParams(window.location.search).get('email'); } catch { return null; }
+    })();
+    const storedEmail = (() => {
+        try { return window.localStorage ? localStorage.getItem('email') : null; } catch { return null; }
+    })();
+    const effectiveEmail = urlEmail || storedEmail || user.email;
     
     useEffect(() => {
         const load = async () => {
             try {
                 setLoading(true);
                 // fetch subscriptions for user
-                const subs = await subscriptionService.getRequestsByUser(user.email);
+                const subs = await subscriptionService.getRequestsByUser(effectiveEmail);
                 setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
                 // fetch accessible files for user
-                const files = await folderService.getUserAccessibleFiles(user.email);
+                const files = await folderService.getUserAccessibleFiles(effectiveEmail);
                 setRawFiles(Array.isArray(files) ? files : []);
                 // normalize to match DownloadReportComponent display: remove prefix before underscore and extension
                 const normalized = (files || []).map((f, idx) => {
@@ -79,7 +86,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         if (view === 'subscriptions') return <SubscriptionDashboard subscriptions={subscriptions} />;
         if (view === 'request') return <SubscriptionRequestComponent subscriptions={subscriptions} />;
         if (view === 'downloads') return <DownloadReportComponent reports={reports} subscriptions={subscriptions} />;
-        if (view === 'profile') return <SubscriberProfile userEmail={user.email} />;
+        if (view === 'profile') return <SubscriberProfile userEmail={effectiveEmail} />;
 
         return (
             <>
@@ -150,7 +157,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                     <button onClick={() => setOpen(!open)} className="menu">☰</button>
                     <div className="actions">
                         <SubscriberNotification
-                            userEmail={user.email}
+                            userEmail={effectiveEmail}
                             subscriptions={subscriptions}
                             files={rawFiles}
                             approvedDomains={approvedDomains}
