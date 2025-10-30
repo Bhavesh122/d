@@ -1,14 +1,37 @@
-import React, { useState } from 'react';
-import { Mail, Phone, Briefcase, Edit2, Save, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Mail, Phone, Briefcase } from 'lucide-react';
 import './SubscriberProfile.css';
+import profileService from '../../../services/profileService';
 
 const SubscriberProfile = () => {
-    const [editing, setEditing] = useState(false);
-    const [data, setData] = useState({
-        name: 'Tony Stark', email: 'tony3000@stark.com', phone: '+1 (555) 123-4567',
-        domain: 'Finance', department: 'Engineering'
-    });
-    const [temp, setTemp] = useState({ ...data });
+    const [data, setData] = useState({ name: '', email: '', phone: '', domain: '', department: '', reportsDownloaded: 0, favoriteReports: 0 });
+    const [temp, setTemp] = useState({ name: '', email: '', phone: '', domain: '', department: '' });
+
+    // TODO: replace with auth user
+    const currentUser = { name: 'Tony Stark', email: 'tony3000@stark.com' };
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const profile = await profileService.getProfile(currentUser.email);
+                setData(profile);
+                setTemp({ name: profile.name || '', email: profile.email || '', phone: profile.phone || '', domain: profile.domain || '', department: profile.department || '' });
+            } catch (e) {
+                // ignore load error for now
+            }
+        };
+        load();
+    }, []);
+
+    const saveField = async (key, value) => {
+        try {
+            const updated = await profileService.updateProfile(currentUser.email, { [key]: value });
+            setData(updated);
+        } catch (e) {
+            // revert on failure
+            setTemp(prev => ({ ...prev, [key]: data[key] }));
+        }
+    };
 
     const fields = [
         { icon: Mail, label: 'Email', key: 'email', type: 'email' },
@@ -17,8 +40,8 @@ const SubscriberProfile = () => {
     ];
 
     const stats = [
-        { label: 'Reports Downloaded', value: '142', color: '#0473BA' },
-        { label: 'Favorite Reports', value: '3', color: '#38D200' }
+        { label: 'Reports Downloaded', value: String(data.reportsDownloaded || 0), color: '#0473BA' },
+        { label: 'Favorite Reports', value: String(data.favoriteReports || 0), color: '#38D200' }
     ];
 
     return (
@@ -28,26 +51,11 @@ const SubscriberProfile = () => {
             <div className="profile-card">
                 <div className="profile-header">
                     <div className="header-info">
-                        {editing ? (
-                            <input className="name-input" value={temp.name} 
-                                onChange={(e) => setTemp({ ...temp, name: e.target.value })} />
-                        ) : <h2>{data.name}</h2>}
+                        <input className="name-input" value={temp.name}
+                            onChange={(e) => setTemp({ ...temp, name: e.target.value })}
+                            onBlur={(e) => saveField('name', e.target.value)} />
                         <p>Subscriber</p>
                     </div>
-                    {!editing ? (
-                        <button className="btn-edit" onClick={() => { setEditing(true); setTemp({ ...data }); }}>
-                            <Edit2 size={16} /> Edit
-                        </button>
-                    ) : (
-                        <div className="edit-btns">
-                            <button className="btn-save" onClick={() => { setData({ ...temp }); setEditing(false); }}>
-                                <Save size={16} /> Save
-                            </button>
-                            <button className="btn-cancel" onClick={() => { setTemp({ ...data }); setEditing(false); }}>
-                                <X size={16} /> Cancel
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 <div className="stats">
@@ -67,10 +75,9 @@ const SubscriberProfile = () => {
                                 <div className="icon"><f.icon size={20} /></div>
                                 <div>
                                     <label>{f.label}</label>
-                                    {editing ? (
-                                        <input type={f.type} value={temp[f.key]} 
-                                            onChange={(e) => setTemp({ ...temp, [f.key]: e.target.value })} />
-                                    ) : <p>{data[f.key]}</p>}
+                                    <input type={f.type} value={temp[f.key]}
+                                        onChange={(e) => setTemp({ ...temp, [f.key]: e.target.value })}
+                                        onBlur={(e) => saveField(f.key, e.target.value)} />
                                 </div>
                             </div>
                         ))}

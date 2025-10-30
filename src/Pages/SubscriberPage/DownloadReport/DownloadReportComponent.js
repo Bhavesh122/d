@@ -3,6 +3,7 @@ import './DownloadReport.css';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import folderService from '../../../services/folderService';
 import reportService from '../../../services/reportService';
+import profileService from '../../../services/profileService';
 
 import PDFViewer from '../PDFViewer/PDFViewer';
 
@@ -116,13 +117,14 @@ const DownloadReportComponent = () => {
 
     const getFavoritesCount = () => reports.filter(r => r.favorite).length;
 
-    const handleDownload = (report) => {
+    const handleDownload = async (report) => {
         // Download file from backend
         const downloadUrl = `http://localhost:8080/api/files/download?folder=${encodeURIComponent(report.folderPath)}&fileName=${encodeURIComponent(report.fileName)}`;
         const link = document.createElement("a");
         link.href = downloadUrl;
         link.download = report.fileName;
         link.click();
+        try { await profileService.incrementDownloads(currentUser.email, 1); } catch {}
     };
 
     const handleSelectReport = (id) => {
@@ -165,6 +167,7 @@ const DownloadReportComponent = () => {
             a.remove();
             window.URL.revokeObjectURL(url);
             setStatusMsg("");
+            try { await profileService.incrementDownloads(currentUser.email, files.length); } catch {}
         } catch (e) {
             console.error('Batch download error:', e);
             setStatusMsg('Failed to download selected reports.');
