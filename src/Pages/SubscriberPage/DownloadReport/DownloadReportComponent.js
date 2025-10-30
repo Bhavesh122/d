@@ -36,11 +36,14 @@ const DownloadReportComponent = () => {
             setLoading(true);
             const files = await folderService.getUserAccessibleFiles(currentUser.email);
             
-            // Transform files to reports format; display title without prefix before the first underscore
+            // Transform files to reports format; display title without prefix before the first underscore and without extension; capture format from extension
             const transformedReports = files.map((file, index) => {
                 const original = file.name || '';
                 const underscoreIdx = original.indexOf('_');
-                const display = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                const afterPrefix = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                const lastDot = afterPrefix.lastIndexOf('.');
+                const display = lastDot > 0 ? afterPrefix.substring(0, lastDot) : afterPrefix;
+                const ext = lastDot > 0 ? afterPrefix.substring(lastDot + 1).toLowerCase() : '';
                 return {
                     id: index + 1,
                     title: display,
@@ -51,7 +54,8 @@ const DownloadReportComponent = () => {
                     favorite: false,
                     size: file.size,
                     fileName: file.name,
-                    folderPath: file.folder
+                    folderPath: file.folder,
+                    format: ext || 'unknown'
                 };
             });
 
@@ -329,13 +333,11 @@ const DownloadReportComponent = () => {
                                                     <i className={`bi bi-star${r.favorite ? '-fill' : ''}`}></i>
                                                 </button>
                                             </div>
-                                            <p className="report-description text-muted mb-3">{r.description}</p>
                                             <div className="report-meta d-flex flex-wrap gap-3 mb-4">
                                                 {[
                                                     { icon: 'folder', label: 'Domain', value: r.domain },
                                                     { icon: 'calendar-event', label: 'Published', value: r.publishedDate },
-                                                    { icon: 'tag', label: 'Version', value: r.version },
-                                                    { icon: 'file-pdf', label: 'Format', value: 'PDF' }
+                                                    { icon: 'file-pdf', label: 'Format', value: r.format }
                                                 ].map((meta, i) => (
                                                     <span key={i} className="meta-item">
                                                         <i className={`bi bi-${meta.icon} me-1`}></i>
