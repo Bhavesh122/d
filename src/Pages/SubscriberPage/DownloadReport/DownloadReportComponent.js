@@ -242,13 +242,13 @@ const DownloadReportComponent = () => {
                                 <input type="text" className="form-control search-input" placeholder="Search reports..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                             </div>
                         </div>
-                        <div className="col-md-5">
+                        <div className="col-md-4">
                             <select className="form-select filter-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                                 <option value="all">All Domains</option>
                                 {domains.map(dom => <option key={dom} value={dom}>{dom}</option>)}
                             </select>
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-md-3">
                             <button
                                 className={`btn w-100 ${showFavorites ? 'btn-warning' : 'btn-outline-warning'}`}
                                 onClick={() => setShowFavorites(!showFavorites)}
