@@ -9,6 +9,7 @@ import '../../AdminPage/AdminDashBoard/Dashboard.css';
 import './SubscriberDashboard.css';
 import subscriptionService from '../../../services/subscriptionService';
 import folderService from '../../../services/folderService';
+import sessionService from '../../../services/sessionService';
 
 const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     const [view, setView] = useState('dashboard');
@@ -19,27 +20,25 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     const [loading, setLoading] = useState(true);
 
     const logout = () => {
+        try { sessionService.clear(); } catch {}
+        setSubscriptions([]);
+        setReports([]);
+        setRawFiles([]);
         navigateToPage('landing');
     };
 
     const user = { name: 'Tony Stark', email: 'tony3000@stark.com', role: 'Subscriber' };
-    const urlEmail = (() => {
-        try { return new URLSearchParams(window.location.search).get('email'); } catch { return null; }
-    })();
-    const storedEmail = (() => {
-        try { return window.localStorage ? localStorage.getItem('email') : null; } catch { return null; }
-    })();
-    const effectiveEmail = urlEmail || storedEmail || user.email;
+    const [currentEmail, setCurrentEmail] = useState(() => sessionService.getEmail() || user.email);
     
     useEffect(() => {
         const load = async () => {
             try {
                 setLoading(true);
                 // fetch subscriptions for user
-                const subs = await subscriptionService.getRequestsByUser(effectiveEmail);
+                const subs = await subscriptionService.getRequestsByUser(currentEmail);
                 setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
                 // fetch accessible files for user
-                const files = await folderService.getUserAccessibleFiles(effectiveEmail);
+                const files = await folderService.getUserAccessibleFiles(currentEmail);
                 setRawFiles(Array.isArray(files) ? files : []);
                 // normalize to match DownloadReportComponent display: remove prefix before underscore and extension
                 const normalized = (files || []).map((f, idx) => {
@@ -66,7 +65,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         load();
         const t = setInterval(load, 15000);
         return () => clearInterval(t);
-    }, []);
+    }, [currentEmail]);
 
     const approvedDomains = subscriptions
         .filter(s => (s.status || '').toUpperCase() === 'APPROVED')
@@ -86,7 +85,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         if (view === 'subscriptions') return <SubscriptionDashboard subscriptions={subscriptions} />;
         if (view === 'request') return <SubscriptionRequestComponent subscriptions={subscriptions} />;
         if (view === 'downloads') return <DownloadReportComponent reports={reports} subscriptions={subscriptions} />;
-        if (view === 'profile') return <SubscriberProfile userEmail={effectiveEmail} />;
+        if (view === 'profile') return <SubscriberProfile userEmail={currentEmail} />;
 
         return (
             <>
@@ -157,7 +156,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                     <button onClick={() => setOpen(!open)} className="menu">☰</button>
                     <div className="actions">
                         <SubscriberNotification
-                            userEmail={effectiveEmail}
+                            userEmail={currentEmail}
                             subscriptions={subscriptions}
                             files={rawFiles}
                             approvedDomains={approvedDomains}
@@ -168,7 +167,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                         </button>
                     </div>
                 </div>
-                <div className="content">{renderContent()}</div>
+                <div className="content" key={currentEmail}>{renderContent()}</div>
             </div>
         </div>
     );
