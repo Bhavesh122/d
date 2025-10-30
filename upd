@@ -1,0 +1,619 @@
+UserService.js
+
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8080/api/users';
+
+const userService = {
+  getByEmail: async (email) => {
+    const res = await axios.get(`${API_BASE_URL}/${encodeURIComponent(email)}`);
+    return res.data;
+  },
+  
+  // Get total users count
+  getTotalUsersCount: async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/count`);
+      return res.data.count || 0;
+    } catch (error) {
+      console.error('Error fetching total users count:', error);
+      return 0;
+    }
+  }
+};
+
+export default userService;
+
+
+fileRoutingService.js
+
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8080/api/routing';
+
+const fileRoutingService = {
+  // Get incoming files
+  getIncomingFiles: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/incoming`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching incoming files:', error);
+      return [];
+    }
+  },
+
+  // Route a single file
+  routeFile: async (fileName) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/route-one?fileName=${encodeURIComponent(fileName)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error routing file:', error);
+      throw error;
+    }
+  },
+
+  // Get active reports count (sent files)
+  getActiveReportsCount: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/active-reports-count`);
+      return response.data.count || 0;
+    } catch (error) {
+      console.error('Error fetching active reports count:', error);
+      return 0;
+    }
+  }
+};
+
+export default fileRoutingService;
+
+Dashboard.js
+
+import React, { useState, useEffect } from "react";
+import ApproveRejectSubscription from "../ApproveReject/ApproveRejectSubscription";
+import { DomainManagement } from "../DomainManagement/DomainManagement";
+import { FilePathManagement } from "../FilePathManagement/FilePathManagement";
+import { UserGroupAccess } from "../UserGroupAccess/UserGroupAccess";
+import './Dashboard.css';
+import AuditLogs from "../AuditLog/AuditLogs";
+import AdminNotification from "../AdminNotification/AdminNotification";
+import { LogOut } from 'lucide-react';
+import subscriptionService from '../../../services/subscriptionService';
+import domainService from '../../../services/domainService';
+import userService from '../../../services/userService';
+import fileRoutingService from '../../../services/fileRoutingService';
+
+export default function Dashboard({ navigate }) {
+    const [view, setView] = useState('dashboard');
+    const [open, setOpen] = useState(true);
+    const [recentRequests, setRecentRequests] = useState([]);
+    const [recentDomains, setRecentDomains] = useState([]);
+    const [loading, setLoading] = useState(true);
+    
+    // Real-time stats from backend
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [activeReports, setActiveReports] = useState(0);
+    const [pendingRequests, setPendingRequests] = useState(0);
+    const [totalDomains, setTotalDomains] = useState(0);
+
+    const logout = () => {
+        navigate('landing'); // Redirect to landing page
+    };
+
+    // Dynamic stats using real backend data
+    const stats = [
+        { label: "Total Users", val: totalUsers.toString(), change: "Registered users" },
+        { label: "Active Reports", val: activeReports.toString(), change: "Successfully sent files" },
+        { label: "Pending Requests", val: pendingRequests.toString(), change: "Requires attention" },
+        { label: "Total Domains", val: totalDomains.toString(), change: "Available domains" }
+    ];
+
+
+    // Fetch latest data from backend and set up periodic refresh
+    useEffect(() => {
+        fetchDashboardData();
+        
+        // Refresh dashboard data every 30 seconds to keep stats current
+        const interval = setInterval(fetchDashboardData, 30000);
+        
+        return () => clearInterval(interval);
+    }, []);
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            
+            // Fetch all stats in parallel for better performance
+            const [
+                allRequests,
+                allDomains,
+                totalUsersCount,
+                activeReportsCount,
+                pendingRequestsData
+            ] = await Promise.all([
+                subscriptionService.getAllRequests(),
+                domainService.getAllDomains(),
+                userService.getTotalUsersCount(),
+                fileRoutingService.getActiveReportsCount(),
+                subscriptionService.getPendingRequests()
+            ]);
+
+            // Update stats
+            setTotalUsers(totalUsersCount);
+            setActiveReports(activeReportsCount);
+            setPendingRequests(pendingRequestsData.length);
+            setTotalDomains(allDomains.length);
+
+            // Fetch latest 3 subscription requests for display
+            const latest3Requests = allRequests
+                .sort((a, b) => new Date(b.requestedDate) - new Date(a.requestedDate))
+                .slice(0, 3)
+                .map(req => ({
+                    id: req.id,
+                    name: req.userName,
+                    domain: req.domainName,
+                    status: req.status
+                }));
+            setRecentRequests(latest3Requests);
+
+            // Fetch latest 3 domains for display
+            const latest3Domains = allDomains
+                .sort((a, b) => new Date(b.createdDate || 0) - new Date(a.createdDate || 0))
+                .slice(0, 3)
+                .map(dom => ({
+                    name: dom.name,
+                    desc: dom.description,
+                    created: dom.createdDate ? new Date(dom.createdDate).toLocaleDateString() : 'N/A'
+                }));
+            setRecentDomains(latest3Domains);
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Manual refresh function for immediate updates
+    const refreshDashboard = () => {
+        fetchDashboardData();
+    };
+
+    const nav = [
+        { name: "Dashboard", icon: "", view: "dashboard" },
+        { name: "Approve/Reject Subscription", icon: "", view: "approve" },
+        { name: "Domain Management", icon: "", view: "domains" },
+        { name: "File Path Management", icon: "", view: "filepaths" },
+        { name: "User Group Access", icon: "", view: "usergroups" },
+        { name: "Logs", icon: "", view: "logs" }
+    ];
+
+
+    const renderContent = () => {
+        if (view == 'approve') return <ApproveRejectSubscription onUpdate={refreshDashboard} />;
+        if (view == 'domains') return <DomainManagement onUpdate={refreshDashboard} />;
+        if (view == 'filepaths') return <FilePathManagement onUpdate={refreshDashboard} />;
+        if (view == 'usergroups') return <UserGroupAccess />;
+        if (view == 'logs') return <AuditLogs />;
+
+
+        return <>
+            <h1>Dashboard</h1>
+            <p className="subtitle">Welcome back! Here's an overview of your system</p>
+            <div className="stats">
+                {stats.map((s, i) => (
+                    <div key={i} className="card">
+                        <div><p className="label">{s.label}</p><h2>{s.val}</h2><p className="change">{s.change} </p> </div>
+
+                    </div>
+                ))}
+            </div>
+            <div className="grid">
+                <div className="card">
+                    <div className="header">
+                        <div><h3> Approve/Reject Subscription</h3><p>Latest user access requests</p></div>
+                        <button onClick={() => setView('approve')}>View all</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>User</th><th>Domain</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentRequests.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No recent requests</td></tr>
+                            ) : (
+                                recentRequests.map(r => (
+                                    <tr key={r.id}>
+                                        <td className="bold">{r.name}</td>
+                                        <td>{r.domain}</td>
+                                        <td><span className={`badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="card">
+                    <div className="header">
+                        <div><h3> Domain Management </h3><p> Available report domains</p>
+                        </div>
+                        <button onClick={() => setView('domains')}> View all</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>Domain Name</th><th> Description </th><th>Created</th></tr></thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentDomains.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No domains available</td></tr>
+                            ) : (
+                                recentDomains.map((d, i) => (
+                                    <tr key={i}>
+                                        <td className="bold">{d.name}</td>
+                                        <td>{d.desc}</td>
+                                        <td>{d.created}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
+    };
+
+    return (
+        <div className="dash">
+            <div className={`side ${open ? 'open' : ''}`}>
+                <div className="side-head">
+                    <span className="logo-icon"></span>
+                    <div><h2>RW Tool</h2><p>Admin Panel</p></div>
+                </div>
+
+                <div className="side-nav">
+                    <p className="nav-label">Management</p>
+                    {nav.map((n, i) => (
+                        <button key={i} onClick={() => setView(n.view)} className={`nav-btn ${view == n.view ? 'active' : ''}`}>
+                            <span>{n.icon}</span>{n.name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="main">
+                <div className="top">
+                    <button onClick={() => setOpen(!open)} className="menu">☰</button>
+                    <div className="actions">
+                        <AdminNotification />
+                        <button onClick={logout} className="logout-btn">
+                            <LogOut style={{ width: 16, height: 16 }} />
+                            Logout
+                        </button>
+                    </div>
+                </div>
+                <div className="content">{renderContent()}</div>
+
+            </div>
+        </div>
+    );
+}
+
+Filepathmanagement.js
+
+import { useState, useEffect } from "react";
+import "./FilePathManagement.css";
+
+export const FilePathManagement = ({ onUpdate }) => {
+  // Incoming files shown to Admin with a Send button
+  const [incomingFiles, setIncomingFiles] = useState([]); // {name, size, modified}
+  const [sendStatus, setSendStatus] = useState({}); // { [fileName]: 'idle'|'sending'|'success'|'error:msg' }
+  const [sentRows, setSentRows] = useState({}); // persist sent files locally by name -> file object
+  const [notification, setNotification] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const SENT_ROWS_KEY = "fpm_sent_rows_v1";
+  const fetchIncoming = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/routing/incoming");
+      const data = await res.json();
+      setIncomingFiles(Array.isArray(data) ? data : []);
+    } catch (e) {
+      // ignore   
+    }
+  };
+
+  useEffect(() => {
+    fetchIncoming();
+    const id = setInterval(fetchIncoming, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Restore sent rows from localStorage on first mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SENT_ROWS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          setSentRows(parsed);
+          // Mark restored rows as success so button shows Sent and status is ACTIVE
+          const successMap = Object.keys(parsed).reduce((acc, n) => { acc[n] = "success"; return acc; }, {});
+          setSendStatus((prev) => ({ ...successMap, ...prev }));
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist sent rows to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(SENT_ROWS_KEY, JSON.stringify(sentRows));
+    } catch {}
+  }, [sentRows]);
+
+
+  const deriveGroup = (prefix) => {
+    const lower = (prefix || "").toLowerCase();
+    if (lower === "finance") return "Finance";
+    if (lower === "risk") return "Risk"; // Risk Management → Risk
+    if (lower === "trading") return "Trading";
+    if (lower === "hr") return "HR"; // HR Analytics → HR
+    if (lower === "operations") return "Operations";
+    if (lower === "compliance") return "Compliance";
+    // fallback capitalize
+    return prefix ? prefix[0].toUpperCase() + prefix.slice(1) : "Unmapped";
+  };
+
+  const toViewModel = (items) => {
+    return items.map((f) => {
+      const raw = f.name || "";
+      const idx = raw.indexOf("_");
+      const prefix = idx > 0 ? raw.substring(0, idx) : "";
+      const display = idx > 0 ? raw.substring(idx + 1) : raw;
+      const group = deriveGroup(prefix);
+      const outputPath = `reports/${group}`;
+      return { ...f, displayName: display, sourcePath: "incoming/", outputPath, prefix };
+    });
+  };
+
+  // Merge incoming files with locally persisted sent rows so sent items remain visible
+  const mergedList = (() => {
+    const byName = new Map();
+    for (const it of incomingFiles) {
+      if (it && it.name) byName.set(it.name, it);
+    }
+    for (const it of Object.values(sentRows)) {
+      if (it && it.name && !byName.has(it.name)) {
+        byName.set(it.name, it);
+      }
+    }
+    return Array.from(byName.values());
+  })();
+
+  const filteredConfigs = toViewModel(mergedList).filter((f) =>
+    (f.displayName || f.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalItems = filteredConfigs.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const startIdx = (currentPageSafe - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const paginatedConfigs = filteredConfigs.slice(startIdx, endIdx);
+
+  const formatSize = (bytes) => {
+    if (!bytes && bytes !== 0) return "";
+    const units = ["B", "KB", "MB", "GB"]; let i = 0; let v = bytes;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(1)} ${units[i]}`;
+  };
+
+  const formatTime = (ms) => {
+    if (!ms) return "";
+    try { return new Date(ms).toLocaleString(); } catch { return ""; }
+  };
+
+  const sendOne = async (file) => {
+    const name = file.name;
+    setSendStatus((s) => ({ ...s, [name]: "sending" }));
+    try {
+      const res = await fetch(`http://localhost:8080/api/routing/route-one?fileName=${encodeURIComponent(name)}`, { method: "POST" });
+      if (!res.ok) {
+        const txt = await res.text();
+        setSendStatus((s) => ({ ...s, [name]: `error:${res.status}` }));
+        setNotification(`Send failed (${res.status}). ${txt || ""}`.trim());
+        setTimeout(() => setNotification(""), 3000);
+        return;
+      }
+      const data = await res.json();
+      if (data && data.moved) {
+        setSendStatus((s) => ({ ...s, [name]: "success" }));
+        // Persist this row so it remains visible after backend removes it from incoming
+        setSentRows((rows) => ({ ...rows, [name]: file }));
+        setNotification(`Sent ${name}`);
+        setTimeout(() => setNotification(""), 1500);
+        // refresh list to remove if moved
+        fetchIncoming();
+        // Update dashboard stats
+        if (onUpdate) {
+          onUpdate();
+        }
+      } else {
+        const reason = data && data.reason ? data.reason : "failed";
+        setSendStatus((s) => ({ ...s, [name]: `error:${reason}` }));
+        setNotification(`Send failed: ${reason}`);
+        setTimeout(() => setNotification(""), 3000);
+      }
+    } catch (e) {
+      setSendStatus((s) => ({ ...s, [name]: `error:${e.message}` }));
+      setNotification(`Send error: ${e.message}`);
+      setTimeout(() => setNotification(""), 3000);
+    }
+  };
+
+  return (
+    <div className="fpm-container">
+      {notification && (
+        <div className="fpm-notification">{notification}</div>
+      )}
+
+      <div className="fpm-header">
+        <div>
+          <h1 className="fpm-title">File Path Management</h1>
+          <p className="fpm-subtitle">Send incoming files to their mapped report folders</p>
+        </div>
+        {/* Configuration modal removed for this demo flow */}
+      </div>
+
+      <div className="fpm-toolbar">
+        <input
+          type="text"
+          placeholder="Search by report name (filename after prefix)..."
+          className="fpm-search-input"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ marginBottom: 0, flex: 1 }}
+        />
+        <div className="fpm-toolbar-spacer" />
+        <button
+          className="fpm-btn-secondary"
+          onClick={() => {
+            if (Object.keys(sentRows).length === 0) return;
+            const ok = window.confirm('Clear all locally remembered "Sent" entries?');
+            if (!ok) return;
+            setSentRows({});
+            setSendStatus({});
+            try { localStorage.removeItem(SENT_ROWS_KEY); } catch {}
+          }}
+          title="Clear locally persisted sent rows"
+          disabled={Object.keys(sentRows).length === 0}
+        >
+          Clear sent
+        </button>
+      </div>
+
+      <table className="fpm-table">
+        <thead>
+          <tr>
+            <th>Report Name</th>
+            <th>Source Path</th>
+            <th>Output Path</th>
+            <th>Actions</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {paginatedConfigs.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="fpm-no-data">
+                No incoming files found
+              </td>
+            </tr>
+          ) : (
+            paginatedConfigs.map((f) => {
+              const st = sendStatus[f.name] || "idle";
+              const isSending = st === "sending";
+              const isSuccess = st === "success";
+              const isError = st.startsWith && st.startsWith("error:");
+              return (
+                <tr key={f.name}>
+                  <td className="fpm-bold">{f.displayName || f.name}</td>
+                  <td className="fpm-path">{f.sourcePath}</td>
+                  <td className="fpm-path">{f.outputPath}</td>
+                  <td>
+                    <button
+                      className={`fpm-btn-primary ${isSuccess ? 'fpm-btn-success' : ''}`}
+                      disabled={isSending || isSuccess}
+                      onClick={() => sendOne(f)}
+                    >
+                      {isSuccess ? 'Sent' : 'Send'}
+                    </button>
+                  </td>
+                  <td>
+                    {isSuccess ? (
+                      <span className="fpm-badge active">ACTIVE</span>
+                    ) : (
+                      <span className="fpm-badge inactive">INACTIVE</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+
+      <div className="fpm-pagination">
+        <button
+          className="fpm-page-btn"
+          disabled={currentPageSafe === 1}
+          onClick={() => setCurrentPage(Math.max(1, currentPageSafe - 1))}
+        >
+          Previous
+        </button>
+
+        <div className="fpm-page-list">
+          {(() => {
+            const buttons = [];
+            const maxButtons = 7;
+            if (totalPages <= maxButtons) {
+              for (let p = 1; p <= totalPages; p++) {
+                buttons.push(
+                  <button
+                    key={p}
+                    className={`fpm-page-number ${p === currentPageSafe ? "active" : ""}`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+              }
+            } else {
+              const pages = new Set([1, 2, totalPages - 1, totalPages, currentPageSafe - 1, currentPageSafe, currentPageSafe + 1]);
+              const normalized = [...pages].filter(p => p >= 1 && p <= totalPages).sort((a,b) => a - b);
+              let prev = 0;
+              for (const p of normalized) {
+                if (p - prev > 1 && prev !== 0) {
+                  buttons.push(<span key={`ellipsis-${p}`} className="fpm-page-ellipsis">…</span>);
+                }
+                buttons.push(
+                  <button
+                    key={p}
+                    className={`fpm-page-number ${p === currentPageSafe ? "active" : ""}`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+                prev = p;
+              }
+            }
+            return buttons;
+          })()}
+        </div>
+
+        <button
+          className="fpm-page-btn"
+          disabled={currentPageSafe === totalPages}
+          onClick={() => setCurrentPage(Math.min(totalPages, currentPageSafe + 1))}
+        >
+          Next
+        </button>
+
+        <div className="fpm-page-info">
+          Page {currentPageSafe} of {totalPages} • {totalItems} items
+        </div>
+      </div>
+
+      {/* Modals for CRUD removed in this demo */}
+    </div>
+  );
+};
+
+
+
