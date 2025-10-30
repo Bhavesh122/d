@@ -32,12 +32,19 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
                 // fetch accessible files for user
                 const files = await folderService.getUserAccessibleFiles(user.email);
-                // normalize to match the minimal fields we show in the dashboard table
-                const normalized = (files || []).map((f, idx) => ({
-                    id: idx + 1,
-                    title: f.name,
-                    domain: f.folder
-                }));
+                // normalize to match DownloadReportComponent display: remove prefix before underscore and extension
+                const normalized = (files || []).map((f, idx) => {
+                    const original = f.name || '';
+                    const underscoreIdx = original.indexOf('_');
+                    const afterPrefix = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                    const lastDot = afterPrefix.lastIndexOf('.');
+                    const display = lastDot > 0 ? afterPrefix.substring(0, lastDot) : afterPrefix;
+                    return {
+                        id: idx + 1,
+                        title: display,
+                        domain: f.folder
+                    };
+                });
                 setReports(normalized);
             } catch (e) {
                 setSubscriptions([]);
