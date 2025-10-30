@@ -87,6 +87,10 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
     setNotifications(notifications.filter(n => n.id !== id));
   };
 
+  const clearAll = () => {
+    setNotifications([]);
+  };
+
   return (
     <div className="admin-notif-container">
       {/* Bell Icon with Badge */}
@@ -152,7 +156,7 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
           {/* Footer */}
           {notifications.length > 0 && (
             <div className="admin-notif-footer">
-              <a href="#" className="admin-view-all">View All Activity</a>
+              <button className="admin-mark-all" onClick={clearAll}>Clear all</button>
             </div>
           )}
         </div>
