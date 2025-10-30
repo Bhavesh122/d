@@ -9,39 +9,57 @@ const userService = {
     return res.data;
   },
   
-  // Get total users count from users table via auth API
+  // Get total users count by fetching all users and counting them
   getTotalUsersCount: async () => {
     try {
-      // Try different possible endpoints for users count
-      let res;
+      console.log('Trying to fetch users for count...');
       
+      // Try auth/users first (most likely since you have auth/signup)
       try {
-        // Try auth/users/count endpoint
-        res = await axios.get(`${AUTH_API_BASE_URL}/users/count`);
-        return res.data.count || res.data.total || 0;
-      } catch (e1) {
-        try {
-          // Try auth/users endpoint and count on frontend
-          res = await axios.get(`${AUTH_API_BASE_URL}/users`);
-          if (Array.isArray(res.data)) {
-            return res.data.length;
-          }
-          return res.data.count || res.data.total || 0;
-        } catch (e2) {
-          try {
-            // Try original users endpoint
-            res = await axios.get(`${API_BASE_URL}`);
-            if (Array.isArray(res.data)) {
-              return res.data.length;
-            }
-            return res.data.count || res.data.total || 0;
-          } catch (e3) {
-            // Last try - users count endpoint
-            res = await axios.get(`${API_BASE_URL}/count`);
-            return res.data.count || res.data.total || 0;
-          }
+        console.log('Trying /api/auth/users...');
+        const res = await axios.get(`${AUTH_API_BASE_URL}/users`);
+        console.log('Auth users response:', res.data);
+        
+        if (Array.isArray(res.data)) {
+          console.log('Found', res.data.length, 'users in auth/users');
+          return res.data.length;
         }
+        
+        // If response has users property
+        if (res.data.users && Array.isArray(res.data.users)) {
+          console.log('Found', res.data.users.length, 'users in auth/users.users');
+          return res.data.users.length;
+        }
+        
+        console.log('Auth users response is not an array, trying next endpoint...');
+      } catch (e1) {
+        console.log('Auth users failed:', e1.message);
       }
+      
+      // Try regular users endpoint
+      try {
+        console.log('Trying /api/users...');
+        const res = await axios.get(`${API_BASE_URL}`);
+        console.log('Users response:', res.data);
+        
+        if (Array.isArray(res.data)) {
+          console.log('Found', res.data.length, 'users in /api/users');
+          return res.data.length;
+        }
+        
+        // If response has users property
+        if (res.data.users && Array.isArray(res.data.users)) {
+          console.log('Found', res.data.users.length, 'users in users.users');
+          return res.data.users.length;
+        }
+        
+        console.log('Users response is not an array');
+      } catch (e2) {
+        console.log('Users endpoint failed:', e2.message);
+      }
+      
+      console.log('All endpoints failed, returning 0');
+      return 0;
     } catch (error) {
       console.error('Error fetching total users count:', error);
       return 0;
