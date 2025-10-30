@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/reports")
@@ -56,10 +58,11 @@ public class ReportController {
                 return ResponseEntity.badRequest().body(res);
             }
 
-            // Construct the preview URL that points to our streaming endpoint
+            // Construct the preview URL that points to our streaming endpoint (URL-encode params)
             String previewUrl = String.format(
                 "http://localhost:8080/reports/stream?folder=%s&fileName=%s",
-                folder, fileName
+                URLEncoder.encode(folder, StandardCharsets.UTF_8),
+                URLEncoder.encode(fileName, StandardCharsets.UTF_8)
             );
             
             res.put("url", previewUrl);
