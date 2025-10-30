@@ -15,6 +15,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
     const [open, setOpen] = useState(true);
     const [subscriptions, setSubscriptions] = useState([]);
     const [reports, setReports] = useState([]);
+    const [rawFiles, setRawFiles] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const logout = () => {
@@ -32,6 +33,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
                 // fetch accessible files for user
                 const files = await folderService.getUserAccessibleFiles(user.email);
+                setRawFiles(Array.isArray(files) ? files : []);
                 // normalize to match DownloadReportComponent display: remove prefix before underscore and extension
                 const normalized = (files || []).map((f, idx) => {
                     const original = f.name || '';
@@ -49,11 +51,14 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
             } catch (e) {
                 setSubscriptions([]);
                 setReports([]);
+                setRawFiles([]);
             } finally {
                 setLoading(false);
             }
         };
         load();
+        const t = setInterval(load, 15000);
+        return () => clearInterval(t);
     }, []);
 
     const approvedDomains = subscriptions
@@ -144,7 +149,12 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
                 <div className="top">
                     <button onClick={() => setOpen(!open)} className="menu">☰</button>
                     <div className="actions">
-                        <SubscriberNotification />
+                        <SubscriberNotification
+                            userEmail={user.email}
+                            subscriptions={subscriptions}
+                            files={rawFiles}
+                            approvedDomains={approvedDomains}
+                        />
                         <button onClick={logout} className="logout-btn">
                             <LogOut style={{ width: 16, height: 16 }} />
                             Logout

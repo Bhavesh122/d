@@ -1,56 +1,75 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, X, CheckCircle, XCircle, FileText } from 'lucide-react';
 import '../../AdminPage/AdminNotification/AdminNotification.css';
 import './SubscriberNotification.css';
-const SubscriberNotification = () => {
+
+const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], approvedDomains = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'accepted',
-      icon: CheckCircle,
-      title: 'Subscription Accepted',
-      message: 'Your subscription request for Finance domain has been accepted',
-      time: '5 mins ago',
-      isNew: true
-    },
-    {
-      id: 2,
-      type: 'file',
-      icon: FileText,
-      title: 'New File Added',
-      message: 'Q4_Financial_Report.pdf added to Finance domain',
-      time: '15 mins ago',
-      isNew: true
-    },
-    {
-      id: 3,
-      type: 'rejected',
-      icon: XCircle,
-      title: 'Subscription Rejected',
-      message: 'Your subscription request for Operations domain has been rejected',
-      time: '1 hour ago',
-      isNew: false
-    },
-    {
-      id: 4,
-      type: 'file',
-      icon: FileText,
-      title: 'New Files Added',
-      message: '3 new files added to Equities domain',
-      time: '2 hours ago',
-      isNew: false
-    },
-    {
-      id: 5,
-      type: 'accepted',
-      icon: CheckCircle,
-      title: 'Subscription Accepted',
-      message: 'Your subscription request for Equities domain has been accepted',
-      time: '3 hours ago',
-      isNew: false
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
+
+  // Track previous snapshots to detect changes
+  const prevSubsRef = useRef([]);
+  const prevFilesRef = useRef([]);
+  const idRef = useRef(1);
+
+  const pushNotif = (partial) => {
+    const now = new Date();
+    const n = {
+      id: idRef.current++,
+      isNew: true,
+      time: now.toLocaleTimeString(),
+      ...partial
+    };
+    setNotifications((prev) => [n, ...prev]);
+  };
+
+  // Detect subscription status changes (approved/rejected)
+  useEffect(() => {
+    const prev = prevSubsRef.current;
+    const prevMap = new Map(prev.map(s => [String(s.id), s]));
+    (subscriptions || []).forEach(s => {
+      const key = String(s.id);
+      const before = prevMap.get(key);
+      const status = (s.status || '').toUpperCase();
+      if (!before && (status === 'APPROVED' || status === 'REJECTED')) {
+        // Newly visible sub with final status
+        pushNotif({
+          type: status === 'APPROVED' ? 'accepted' : 'rejected',
+          icon: status === 'APPROVED' ? CheckCircle : XCircle,
+          title: `Subscription ${status === 'APPROVED' ? 'Accepted' : 'Rejected'}`,
+          message: `Your subscription request for ${(s.domain || s.domainName || s.folder || s.category || '').toString()} has been ${status === 'APPROVED' ? 'accepted' : 'rejected'}`
+        });
+      } else if (before && (before.status || '').toUpperCase() !== status && (status === 'APPROVED' || status === 'REJECTED')) {
+        // Status transitioned to approved/rejected
+        pushNotif({
+          type: status === 'APPROVED' ? 'accepted' : 'rejected',
+          icon: status === 'APPROVED' ? CheckCircle : XCircle,
+          title: `Subscription ${status === 'APPROVED' ? 'Accepted' : 'Rejected'}`,
+          message: `Your subscription request for ${(s.domain || s.domainName || s.folder || s.category || '').toString()} has been ${status === 'APPROVED' ? 'accepted' : 'rejected'}`
+        });
+      }
+    });
+    prevSubsRef.current = subscriptions || [];
+  }, [subscriptions]);
+
+  // Detect new files in approved domains
+  useEffect(() => {
+    const prevFiles = prevFilesRef.current;
+    const prevKeys = new Set(prevFiles.map(f => `${f.folder}|${f.name}`));
+    (files || []).forEach(f => {
+      const inApproved = approvedDomains.includes(f.folder);
+      const key = `${f.folder}|${f.name}`;
+      if (inApproved && !prevKeys.has(key)) {
+        pushNotif({
+          type: 'file',
+          icon: FileText,
+          title: 'New File Added',
+          message: `${f.name} added to ${f.folder}`
+        });
+      }
+    });
+    prevFilesRef.current = files || [];
+  }, [files, approvedDomains]);
 
   const unreadCount = notifications.filter(n => n.isNew).length;
 
