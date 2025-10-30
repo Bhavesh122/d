@@ -11,6 +11,7 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
   const prevSubsRef = useRef([]);
   const prevFilesRef = useRef([]);
   const idRef = useRef(1);
+  const containerRef = useRef(null);
 
   const pushNotif = (partial) => {
     const now = new Date();
@@ -91,8 +92,21 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
     setNotifications([]);
   };
 
+  // Close on outside click
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!isOpen) return;
+      const node = containerRef.current;
+      if (node && !node.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [isOpen]);
+
   return (
-    <div className="admin-notif-container">
+    <div className="admin-notif-container" ref={containerRef}>
       {/* Bell Icon with Badge */}
       <div className="admin-notif-trigger" onClick={() => setIsOpen(!isOpen)}>
         <Bell size={20} />
