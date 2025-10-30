@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bell, X, CheckCircle, XCircle, FileText } from 'lucide-react';
 import '../../AdminPage/AdminNotification/AdminNotification.css';
 import './SubscriberNotification.css';
+import notificationService from '../../../services/notificationService';
 
 const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], approvedDomains = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,15 +14,29 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
   const idRef = useRef(1);
   const containerRef = useRef(null);
 
-  const pushNotif = (partial) => {
+  const pushNotif = async (partial) => {
     const now = new Date();
-    const n = {
-      id: idRef.current++,
+    let n = {
+      id: `local-${idRef.current++}`,
       isNew: true,
       time: now.toLocaleTimeString(),
       ...partial
     };
     setNotifications((prev) => [n, ...prev]);
+    try {
+      const created = await notificationService.add(userEmail, {
+        type: partial.type,
+        title: partial.title,
+        message: partial.message
+      });
+      // replace local with backend id
+      setNotifications((prev) => prev.map(x => x.id === n.id ? {
+        ...x,
+        id: created.id,
+        time: new Date(created.time).toLocaleTimeString(),
+        isNew: !created.read
+      } : x));
+    } catch {}
   };
 
   // Detect subscription status changes (approved/rejected)
@@ -72,24 +87,49 @@ const SubscriberNotification = ({ userEmail, subscriptions = [], files = [], app
     prevFilesRef.current = files || [];
   }, [files, approvedDomains]);
 
+  // Load existing notifications from backend on mount/user change
+  useEffect(() => {
+    const load = async () => {
+      if (!userEmail) return;
+      try {
+        const list = await notificationService.list(userEmail);
+        const mapped = (list || []).map(n => ({
+          id: n.id,
+          type: n.type,
+          icon: n.type === 'accepted' ? CheckCircle : (n.type === 'rejected' ? XCircle : FileText),
+          title: n.title,
+          message: n.message,
+          time: new Date(n.time).toLocaleTimeString(),
+          isNew: !n.read
+        }));
+        // newest first, backend already adds first but sort by time desc to be safe
+        mapped.sort((a, b) => (a.time > b.time ? -1 : 1));
+        setNotifications(mapped);
+      } catch {}
+    };
+    load();
+  }, [userEmail]);
+
   const unreadCount = notifications.filter(n => n.isNew).length;
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, isNew: false } : n
-    ));
+  const markAsRead = async (id) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, isNew: false } : n));
+    try { await notificationService.markRead(userEmail, id); } catch {}
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(notifications.map(n => ({ ...n, isNew: false })));
+    try { await notificationService.markAllRead(userEmail); } catch {}
   };
 
-  const removeNotification = (id) => {
+  const removeNotification = async (id) => {
     setNotifications(notifications.filter(n => n.id !== id));
+    try { await notificationService.delete(userEmail, id); } catch {}
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     setNotifications([]);
+    try { await notificationService.clear(userEmail); } catch {}
   };
 
   // Close on outside click
