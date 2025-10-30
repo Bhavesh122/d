@@ -46,6 +46,39 @@ const reportService = {
     if (!res.ok) throw new Error("Failed to download selected reports");
     const blob = await res.blob();
     return blob;
+  },
+
+  /**
+   * Favorites APIs
+   */
+  getFavorites: async (userId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/favorites?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) throw new Error("Failed to load favorites");
+      const data = await res.json();
+      return data.favorites || [];
+    } catch (e) {
+      console.error("Error fetching favorites:", e);
+      return [];
+    }
+  },
+  addFavorite: async (userId, folder, fileName) => {
+    const res = await fetch(`${API_BASE_URL}/api/favorites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, folder, fileName })
+    });
+    if (!res.ok) throw new Error("Failed to add favorite");
+    return res.json();
+  },
+  removeFavorite: async (userId, folder, fileName) => {
+    const res = await fetch(`${API_BASE_URL}/api/favorites`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, folder, fileName })
+    });
+    if (!res.ok) throw new Error("Failed to remove favorite");
+    return res.json();
   }
 };
 

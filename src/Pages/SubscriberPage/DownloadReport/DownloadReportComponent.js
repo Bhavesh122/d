@@ -36,21 +36,38 @@ const DownloadReportComponent = () => {
             setLoading(true);
             const files = await folderService.getUserAccessibleFiles(currentUser.email);
             
-            // Transform files to reports format
-            const transformedReports = files.map((file, index) => ({
-                id: index + 1,
-                title: file.name,
-                description: `File from ${file.folder} folder`,
-                domain: file.folder,
-                publishedDate: file.modified ? new Date(file.modified).toLocaleDateString() : 'N/A',
-                version: 'v1.0',
-                favorite: false,
-                size: file.size,
-                fileName: file.name,
-                folderPath: file.folder
+            // Transform files to reports format; display title without prefix before the first underscore
+            const transformedReports = files.map((file, index) => {
+                const original = file.name || '';
+                const underscoreIdx = original.indexOf('_');
+                const display = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                return {
+                    id: index + 1,
+                    title: display,
+                    description: `File from ${file.folder} folder`,
+                    domain: file.folder,
+                    publishedDate: file.modified ? new Date(file.modified).toLocaleDateString() : 'N/A',
+                    version: 'v1.0',
+                    favorite: false,
+                    size: file.size,
+                    fileName: file.name,
+                    folderPath: file.folder
+                };
+            });
+
+            // Load favorites from backend and mark reports
+            let favs = [];
+            try {
+                favs = await reportService.getFavorites(currentUser.email);
+            } catch (e) {
+                // ignore errors; keep favorites empty
+            }
+            const favoredReports = transformedReports.map(r => ({
+                ...r,
+                favorite: favs.some(f => f.folder === r.folderPath && f.fileName === r.fileName)
             }));
-            
-            setReports(transformedReports);
+
+            setReports(favoredReports);
             
             // Extract unique domains (folders)
             const uniqueDomains = [...new Set(files.map(f => f.folder))].sort();
@@ -71,8 +88,26 @@ const DownloadReportComponent = () => {
         return search && dom && fav;
     });
 
-    const toggleFavorite = (id) => {
-        setReports(reports.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    const toggleFavorite = async (id) => {
+        const target = reports.find(r => r.id === id);
+        if (!target) return;
+        const userId = currentUser.email;
+
+        // Optimistic update
+        const newFav = !target.favorite;
+        setReports(prev => prev.map(r => r.id === id ? { ...r, favorite: newFav } : r));
+
+        try {
+            if (newFav) {
+                await reportService.addFavorite(userId, target.folderPath, target.fileName);
+            } else {
+                await reportService.removeFavorite(userId, target.folderPath, target.fileName);
+            }
+        } catch (e) {
+            // revert on error
+            setReports(prev => prev.map(r => r.id === id ? { ...r, favorite: !newFav } : r));
+            setStatusMsg('Failed to update favorites.');
+        }
     };
 
     const getFavoritesCount = () => reports.filter(r => r.favorite).length;
