@@ -79,7 +79,7 @@ const SubscriberDashboard = ({ navigate: navigateToPage }) => {
         if (view === 'subscriptions') return <SubscriptionDashboard subscriptions={subscriptions} />;
         if (view === 'request') return <SubscriptionRequestComponent subscriptions={subscriptions} />;
         if (view === 'downloads') return <DownloadReportComponent reports={reports} subscriptions={subscriptions} />;
-        if (view === 'profile') return <SubscriberProfile />;
+        if (view === 'profile') return <SubscriberProfile userEmail={user.email} />;
 
         return (
             <>
