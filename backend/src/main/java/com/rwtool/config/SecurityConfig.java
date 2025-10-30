@@ -53,6 +53,7 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable()) // Disable CSRF for development
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
+            .headers(headers -> headers.frameOptions(frame -> frame.disable())) // Allow embedding in iframes (for PDF preview)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Allow authentication endpoints
