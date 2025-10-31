@@ -1,0 +1,159 @@
+AuditLogService.java
+package com.rwtool.service;
+
+import com.rwtool.dto.AuditLogDTO;
+import com.rwtool.dto.PageResponse;
+import com.rwtool.model.AuditLog;
+import com.rwtool.repository.AuditLogRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class AuditLogService {
+    
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+    
+    // Create audit log entry
+    public void logActivity(String userEmail, String role, String action, String details, String status) {
+        AuditLog auditLog = new AuditLog(userEmail, role, action, details, status);
+        auditLogRepository.save(auditLog);
+    }
+    
+    
+    // Get recent activity (last 10 entries)
+    public List<AuditLogDTO> getRecentActivity() {
+        List<AuditLog> recentLogs = auditLogRepository.findTop10ByOrderByTimestampDesc();
+        return recentLogs.stream()
+                .map(AuditLogDTO::new)
+                .collect(Collectors.toList());
+    }
+    
+    // Get paginated audit logs with filters
+    public PageResponse<AuditLogDTO> getAuditLogs(String userEmail, String action, String role, 
+                                                  String status, String dateRange, String searchTerm,
+                                                  int page, int size) {
+        
+        // Calculate date range
+        LocalDateTime startDate = null;
+        LocalDateTime endDate = LocalDateTime.now();
+        
+        if (dateRange != null) {
+            switch (dateRange) {
+                case "today":
+                    startDate = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "7days":
+                    startDate = LocalDateTime.now().minusDays(7);
+                    break;
+                case "30days":
+                    startDate = LocalDateTime.now().minusDays(30);
+                    break;
+                case "90days":
+                    startDate = LocalDateTime.now().minusDays(90);
+                    break;
+            }
+        }
+        
+        // Convert filter values
+        String filterUserEmail = (userEmail != null && !userEmail.equals("All Users")) ? userEmail : null;
+        String filterAction = (action != null && !action.equals("All Actions")) ? action : null;
+        String filterRole = (role != null && !role.equals("All Users")) ? role : null;
+        String filterStatus = (status != null && !status.equals("All Status")) ? status : null;
+        String filterSearchTerm = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : null;
+        
+        // Create pageable with sorting by timestamp descending
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+        
+        // Get filtered results
+        Page<AuditLog> auditLogPage = auditLogRepository.findWithFilters(
+                filterUserEmail, filterAction, filterRole, filterStatus, 
+                startDate, endDate, filterSearchTerm, pageable);
+        
+        // Convert to DTOs
+        List<AuditLogDTO> auditLogDTOs = auditLogPage.getContent().stream()
+                .map(AuditLogDTO::new)
+                .collect(Collectors.toList());
+        
+        return new PageResponse<>(
+                auditLogDTOs,
+                auditLogPage.getTotalElements(),
+                auditLogPage.getNumber(),
+                auditLogPage.getSize(),
+                auditLogPage.getTotalPages(),
+                auditLogPage.isFirst(),
+                auditLogPage.isLast()
+        );
+    }
+    
+    // Get all unique actions for filter dropdown
+    public List<String> getAllActions() {
+        return auditLogRepository.findAll().stream()
+                .map(AuditLog::getAction)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+    
+    // Get all unique roles for filter dropdown
+    public List<String> getAllRoles() {
+        return auditLogRepository.findAll().stream()
+                .map(AuditLog::getRole)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+}
+
+
+PageResponse.java
+
+package com.rwtool.dto;
+
+import java.util.List;
+
+public class PageResponse<T> {
+    private List<T> content;
+    private long totalElements;
+    private int totalPages;
+    private int number;
+    private int size;
+    private boolean first;
+    private boolean last;
+
+    public PageResponse() {}
+
+    public PageResponse(List<T> content, long totalElements, int number, int size, int totalPages, boolean first, boolean last) {
+        this.content = content;
+        this.totalElements = totalElements;
+        this.number = number;
+        this.size = size;
+        this.totalPages = totalPages;
+        this.first = first;
+        this.last = last;
+    }
+
+    public List<T> getContent() { return content; }
+    public void setContent(List<T> content) { this.content = content; }
+    public long getTotalElements() { return totalElements; }
+    public void setTotalElements(long totalElements) { this.totalElements = totalElements; }
+    public int getTotalPages() { return totalPages; }
+    public void setTotalPages(int totalPages) { this.totalPages = totalPages; }
+    public int getNumber() { return number; }
+    public void setNumber(int number) { this.number = number; }
+    public int getSize() { return size; }
+    public void setSize(int size) { this.size = size; }
+    public boolean isFirst() { return first; }
+    public void setFirst(boolean first) { this.first = first; }
+    public boolean isLast() { return last; }
+    public void setLast(boolean last) { this.last = last; }
+}
+
