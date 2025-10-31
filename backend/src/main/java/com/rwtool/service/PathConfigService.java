@@ -25,7 +25,15 @@ public class PathConfigService {
         Page<PathConfig> result = (search == null || search.isBlank())
                 ? repository.findAll(pageable)
                 : repository.search(search, pageable);
-        return new PageResponse<>(result.getContent(), result.getTotalElements(), page, pageSize);
+        return new PageResponse<>(
+                result.getContent(),
+                result.getTotalElements(),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalPages(),
+                result.isFirst(),
+                result.isLast()
+        );
     }
 
     @Transactional

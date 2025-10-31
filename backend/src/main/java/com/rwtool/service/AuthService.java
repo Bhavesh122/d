@@ -88,4 +88,8 @@ public class AuthService {
                 user.getRole().name()
         );
     }
+    
+    public long getTotalUserCount() {
+        return userRepository.count();
+    }
 }

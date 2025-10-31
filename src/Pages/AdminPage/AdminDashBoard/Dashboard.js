@@ -9,6 +9,8 @@ import AdminNotification from "../AdminNotification/AdminNotification";
 import { LogOut } from 'lucide-react';
 import subscriptionService from '../../../services/subscriptionService';
 import domainService from '../../../services/domainService';
+import userService from '../../../services/userService';
+import fileRoutingService from '../../../services/fileRoutingService';
 
 export default function Dashboard({ navigate }) {
     const [view, setView] = useState('dashboard');
@@ -16,31 +18,63 @@ export default function Dashboard({ navigate }) {
     const [recentRequests, setRecentRequests] = useState([]);
     const [recentDomains, setRecentDomains] = useState([]);
     const [loading, setLoading] = useState(true);
+    
+    // Real-time stats from backend
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [activeReports, setActiveReports] = useState(0);
+    const [pendingRequests, setPendingRequests] = useState(0);
+    const [totalDomains, setTotalDomains] = useState(0);
 
     const logout = () => {
         navigate('landing'); // Redirect to landing page
     };
 
-
+    // Dynamic stats using real backend data
     const stats = [
-        { label: "Total Users", val: "1,248", change: "+12% from last month " },
-        { label: "Active Reports", val: "348", change: "+8 new this week" },
-        { label: "Pending Requests", val: "23", change: "Requires attention" },
-        { label: "System Activity", val: "4", change: "Last 24 hours" }
-
+        { label: "Total Users", val: totalUsers.toString(), change: "Registered users" },
+        { label: "Active Reports", val: activeReports.toString(), change: "Successfully sent files" },
+        { label: "Pending Requests", val: pendingRequests.toString(), change: "Requires attention" },
+        { label: "Total Domains", val: totalDomains.toString(), change: "Available domains" }
     ];
 
 
-    // Fetch latest data from backend
+    // Fetch latest data from backend and set up periodic refresh
     useEffect(() => {
         fetchDashboardData();
+        
+        // Refresh dashboard data every 30 seconds to keep stats current
+        const interval = setInterval(fetchDashboardData, 30000);
+        
+        return () => clearInterval(interval);
     }, []);
 
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            // Fetch latest 3 subscription requests
-            const allRequests = await subscriptionService.getAllRequests();
+            
+            // Fetch all stats in parallel for better performance
+            const [
+                allRequests,
+                allDomains,
+                totalUsersCount,
+                pendingRequestsData
+            ] = await Promise.all([
+                subscriptionService.getAllRequests(),
+                domainService.getAllDomains(),
+                userService.getTotalUsersCount(),
+                subscriptionService.getPendingRequests()
+            ]);
+
+            // Get active reports count from localStorage (synchronous)
+            const activeReportsCount = fileRoutingService.getActiveReportsCount();
+
+            // Update stats
+            setTotalUsers(totalUsersCount);
+            setActiveReports(activeReportsCount);
+            setPendingRequests(pendingRequestsData.length);
+            setTotalDomains(allDomains.length);
+
+            // Fetch latest 3 subscription requests for display
             const latest3Requests = allRequests
                 .sort((a, b) => new Date(b.requestedDate) - new Date(a.requestedDate))
                 .slice(0, 3)
@@ -52,8 +86,7 @@ export default function Dashboard({ navigate }) {
                 }));
             setRecentRequests(latest3Requests);
 
-            // Fetch latest 3 domains
-            const allDomains = await domainService.getAllDomains();
+            // Fetch latest 3 domains for display
             const latest3Domains = allDomains
                 .sort((a, b) => new Date(b.createdDate || 0) - new Date(a.createdDate || 0))
                 .slice(0, 3)
@@ -70,6 +103,11 @@ export default function Dashboard({ navigate }) {
         }
     };
 
+    // Manual refresh function for immediate updates
+    const refreshDashboard = () => {
+        fetchDashboardData();
+    };
+
     const nav = [
         { name: "Dashboard", icon: "", view: "dashboard" },
         { name: "Approve/Reject Subscription", icon: "", view: "approve" },
@@ -81,9 +119,9 @@ export default function Dashboard({ navigate }) {
 
 
     const renderContent = () => {
-        if (view == 'approve') return <ApproveRejectSubscription />;
-        if (view == 'domains') return <DomainManagement />;
-        if (view == 'filepaths') return <FilePathManagement />;
+        if (view == 'approve') return <ApproveRejectSubscription onUpdate={refreshDashboard} />;
+        if (view == 'domains') return <DomainManagement onUpdate={refreshDashboard} />;
+        if (view == 'filepaths') return <FilePathManagement onUpdate={refreshDashboard} />;
         if (view == 'usergroups') return <UserGroupAccess />;
         if (view == 'logs') return <AuditLogs />;
 

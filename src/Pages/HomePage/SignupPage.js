@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Phone, Briefcase } from 'lucide-react';
+import authService from '../../services/authService';
 
 const SignupPage = ({ role, navigate }) => {
     const [formData, setFormData] = useState({

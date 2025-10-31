@@ -4,6 +4,7 @@ import com.rwtool.dto.AuthResponse;
 import com.rwtool.dto.LoginRequest;
 import com.rwtool.dto.SignupRequest;
 import com.rwtool.service.AuthService;
+import com.rwtool.service.AuditLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,6 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:3000")
@@ -23,6 +27,9 @@ public class AuthController {
     @Autowired
     private AuthService authService;
     
+    @Autowired
+    private AuditLogService auditLogService;
+    
     @Operation(summary = "Register a new user", description = "Create a new user account")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "User created successfully"),
@@ -30,8 +37,26 @@ public class AuthController {
     })
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
-        AuthResponse response = authService.signup(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        try {
+            AuthResponse response = authService.signup(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "User signed up successfully", 
+                "success"
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "Failed signup attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
+        }
     }
     
     @Operation(summary = "Login user", description = "Authenticate user and return JWT token")
@@ -41,8 +66,42 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+        try {
+            AuthResponse response = authService.login(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                response.getRole(), 
+                "USER_LOGIN", 
+                "User logged in successfully", 
+                "success"
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Unknown", 
+                "LOGIN_FAILED", 
+                "Failed login attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
+        }
+    }
+    
+    @Operation(summary = "Get total user count", description = "Get total")
+    @ApiResponse(responseCode = "200", description = "Users count retrieved")
+    @GetMapping("/users/count")
+    public ResponseEntity<Map<String, Long>> getUsersCount() {
+        try {
+            Long count = authService.getTotalUserCount();
+            Map<String, Long> response = new HashMap<>();
+            response.put("count", count);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Long> errorResponse = new HashMap<>();
+            errorResponse.put("count", 0L);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
     
     @Operation(summary = "Health check", description = "Check if the authentication service is running")

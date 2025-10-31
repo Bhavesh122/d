@@ -1,154 +1,159 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./FilePathManagement.css";
 
-export const FilePathManagement = () => {
-  const [pathConfigs, setPathConfigs] = useState([
-    { 
-      id: "1", 
-      reportName: "KYC Reports", 
-      sourcePath: "/incoming/kyc", 
-      outputPath: "/reports/compliance/kyc",
-      status: "Active",
-      createdDate: "2024-01-15" 
-    },
-    { 
-      id: "2", 
-      reportName: "Dormant Reports", 
-      sourcePath: "/incoming/dormant", 
-      outputPath: "/reports/compliance/dormant",
-      status: "Active",
-      createdDate: "2024-02-20" 
-    },
-    { 
-      id: "3", 
-      reportName: "AML Reports", 
-      sourcePath: "/incoming/aml", 
-      outputPath: "/reports/compliance/aml",
-      status: "Active",
-      createdDate: "2024-03-10" 
-    }
-  ]);
-
-  const [showModal, setShowModal] = useState(false);
-  const [editingConfig, setEditingConfig] = useState(null);
-  const [formData, setFormData] = useState({ 
-    reportName: "", 
-    sourcePath: "", 
-    outputPath: "",
-    status: "Active"
-  });
+export const FilePathManagement = ({ onUpdate }) => {
+  // Incoming files shown to Admin with a Send button
+  const [incomingFiles, setIncomingFiles] = useState([]); // {name, size, modified}
+  const [sendStatus, setSendStatus] = useState({}); // { [fileName]: 'idle'|'sending'|'success'|'error:msg' }
+  const [sentRows, setSentRows] = useState({}); // persist sent files locally by name -> file object
   const [notification, setNotification] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfigId, setDeleteConfigId] = useState(null);
-
-  const openModal = (config = null) => {
-    setEditingConfig(config);
-    setFormData(
-      config 
-        ? { 
-            reportName: config.reportName, 
-            sourcePath: config.sourcePath,
-            outputPath: config.outputPath,
-            status: config.status
-          } 
-        : { reportName: "", sourcePath: "", outputPath: "", status: "Active" }
-    );
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setEditingConfig(null);
-    setFormData({ reportName: "", sourcePath: "", outputPath: "", status: "Active" });
-  };
-
-  const saveConfig = () => {
-    if (!formData.reportName.trim() || !formData.sourcePath.trim() || !formData.outputPath.trim()) {
-      setNotification("All fields are required");
-      setTimeout(() => setNotification(""), 2000);
-      return;
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const SENT_ROWS_KEY = "fpm_sent_rows_v1";
+  const fetchIncoming = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/routing/incoming");
+      const data = await res.json();
+      setIncomingFiles(Array.isArray(data) ? data : []);
+    } catch (e) {
+      // ignore   
     }
+  };
 
-    const isDuplicate = pathConfigs.some(
-      (c) => 
-        c.reportName.toLowerCase() === formData.reportName.trim().toLowerCase() && 
-        c.id !== editingConfig?.id
-    );
-    
-    if (isDuplicate) {
-      setNotification("Report name already exists");
-      setTimeout(() => setNotification(""), 2000);
-      return;
+  useEffect(() => {
+    fetchIncoming();
+    const id = setInterval(fetchIncoming, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Restore sent rows from localStorage on first mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SENT_ROWS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          setSentRows(parsed);
+          // Mark restored rows as success so button shows Sent and status is ACTIVE
+          const successMap = Object.keys(parsed).reduce((acc, n) => { acc[n] = "success"; return acc; }, {});
+          setSendStatus((prev) => ({ ...successMap, ...prev }));
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist sent rows to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(SENT_ROWS_KEY, JSON.stringify(sentRows));
+    } catch {}
+  }, [sentRows]);
+
+
+  const deriveGroup = (prefix) => {
+    const lower = (prefix || "").toLowerCase();
+    if (lower === "finance") return "Finance";
+    if (lower === "risk") return "Risk"; // Risk Management → Risk
+    if (lower === "trading") return "Trading";
+    if (lower === "hr") return "HR"; // HR Analytics → HR
+    if (lower === "operations") return "Operations";
+    if (lower === "compliance") return "Compliance";
+    // fallback capitalize
+    return prefix ? prefix[0].toUpperCase() + prefix.slice(1) : "Unmapped";
+  };
+
+  const toViewModel = (items) => {
+    return items.map((f) => {
+      const raw = f.name || "";
+      const idx = raw.indexOf("_");
+      const prefix = idx > 0 ? raw.substring(0, idx) : "";
+      const display = idx > 0 ? raw.substring(idx + 1) : raw;
+      const group = deriveGroup(prefix);
+      const outputPath = `reports/${group}`;
+      return { ...f, displayName: display, sourcePath: "incoming/", outputPath, prefix };
+    });
+  };
+
+  // Merge incoming files with locally persisted sent rows so sent items remain visible
+  const mergedList = (() => {
+    const byName = new Map();
+    for (const it of incomingFiles) {
+      if (it && it.name) byName.set(it.name, it);
     }
-
-    if (editingConfig) {
-      setPathConfigs(
-        pathConfigs.map(c => 
-          c.id === editingConfig.id 
-            ? { 
-                ...c, 
-                reportName: formData.reportName, 
-                sourcePath: formData.sourcePath,
-                outputPath: formData.outputPath,
-                status: formData.status
-              } 
-            : c
-        )
-      );
-      setNotification("Path configuration updated successfully");
-    } else {
-      const newConfig = {
-        id: Date.now().toString(),
-        reportName: formData.reportName,
-        sourcePath: formData.sourcePath,
-        outputPath: formData.outputPath,
-        status: formData.status,
-        createdDate: new Date().toISOString().split("T")[0]
-      };
-      setPathConfigs([...pathConfigs, newConfig]);
-      setNotification("Path configuration created successfully");
+    for (const it of Object.values(sentRows)) {
+      if (it && it.name && !byName.has(it.name)) {
+        byName.set(it.name, it);
+      }
     }
+    return Array.from(byName.values());
+  })();
 
-    closeModal();
-    setTimeout(() => setNotification(""), 3000);
-  };
-
-  const openDeleteConfirm = (configId) => {
-    setDeleteConfigId(configId);
-    setShowDeleteConfirm(true);
-  };
-
-  const closeDeleteConfirm = () => {
-    setShowDeleteConfirm(false);
-    setDeleteConfigId(null);
-  };
-
-  const deleteConfig = () => {
-    setPathConfigs(pathConfigs.filter(c => c.id !== deleteConfigId));
-    setNotification("Path configuration deleted successfully");
-    closeDeleteConfirm();
-    setTimeout(() => setNotification(""), 3000);
-  };
-
-  const toggleStatus = (configId) => {
-    setPathConfigs(
-      pathConfigs.map(c => 
-        c.id === configId 
-          ? { ...c, status: c.status === "Active" ? "Inactive" : "Active" } 
-          : c
-      )
-    );
-    setNotification("Status updated successfully");
-    setTimeout(() => setNotification(""), 2000);
-  };
-
-  const filteredConfigs = pathConfigs.filter(
-    (c) =>
-      c.reportName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.sourcePath.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.outputPath.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredConfigs = toViewModel(mergedList).filter((f) =>
+    (f.displayName || f.name || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalItems = filteredConfigs.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const startIdx = (currentPageSafe - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const paginatedConfigs = filteredConfigs.slice(startIdx, endIdx);
+
+  const formatSize = (bytes) => {
+    if (!bytes && bytes !== 0) return "";
+    const units = ["B", "KB", "MB", "GB"]; let i = 0; let v = bytes;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(1)} ${units[i]}`;
+  };
+
+  const formatTime = (ms) => {
+    if (!ms) return "";
+    try { return new Date(ms).toLocaleString(); } catch { return ""; }
+  };
+
+  const sendOne = async (file) => {
+    const name = file.name;
+    setSendStatus((s) => ({ ...s, [name]: "sending" }));
+    try {
+      const res = await fetch(`http://localhost:8080/api/routing/route-one?fileName=${encodeURIComponent(name)}`, { method: "POST" });
+      if (!res.ok) {
+        const txt = await res.text();
+        setSendStatus((s) => ({ ...s, [name]: `error:${res.status}` }));
+        setNotification(`Send failed (${res.status}). ${txt || ""}`.trim());
+        setTimeout(() => setNotification(""), 3000);
+        return;
+      }
+      const data = await res.json();
+      if (data && data.moved) {
+        setSendStatus((s) => ({ ...s, [name]: "success" }));
+        // Persist this row so it remains visible after backend removes it from incoming
+        setSentRows((rows) => ({ ...rows, [name]: file }));
+        setNotification(`Sent ${name}`);
+        setTimeout(() => setNotification(""), 1500);
+        // refresh list to remove if moved
+        fetchIncoming();
+        // Update dashboard stats
+        if (onUpdate) {
+          onUpdate();
+        }
+      } else {
+        const reason = data && data.reason ? data.reason : "failed";
+        setSendStatus((s) => ({ ...s, [name]: `error:${reason}` }));
+        setNotification(`Send failed: ${reason}`);
+        setTimeout(() => setNotification(""), 3000);
+      }
+    } catch (e) {
+      setSendStatus((s) => ({ ...s, [name]: `error:${e.message}` }));
+      setNotification(`Send error: ${e.message}`);
+      setTimeout(() => setNotification(""), 3000);
+    }
+  };
 
   return (
     <div className="fpm-container">
@@ -159,20 +164,37 @@ export const FilePathManagement = () => {
       <div className="fpm-header">
         <div>
           <h1 className="fpm-title">File Path Management</h1>
-          <p className="fpm-subtitle">Configure automatic file transfer paths for reports</p>
+          <p className="fpm-subtitle">Send incoming files to their mapped report folders</p>
         </div>
-        <button className="fpm-btn-primary" onClick={() => openModal()}>
-          + Add Path Configuration
-        </button>
+        {/* Configuration modal removed for this demo flow */}
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by report name or path..."
-        className="fpm-search-input"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
+      <div className="fpm-toolbar">
+        <input
+          type="text"
+          placeholder="Search by report name (filename after prefix)..."
+          className="fpm-search-input"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ marginBottom: 0, flex: 1 }}
+        />
+        <div className="fpm-toolbar-spacer" />
+        <button
+          className="fpm-btn-secondary"
+          onClick={() => {
+            if (Object.keys(sentRows).length === 0) return;
+            const ok = window.confirm('Clear all locally remembered "Sent" entries?');
+            if (!ok) return;
+            setSentRows({});
+            setSendStatus({});
+            try { localStorage.removeItem(SENT_ROWS_KEY); } catch {}
+          }}
+          title="Clear locally persisted sent rows"
+          disabled={Object.keys(sentRows).length === 0}
+        >
+          Clear sent
+        </button>
+      </div>
 
       <table className="fpm-table">
         <thead>
@@ -180,127 +202,114 @@ export const FilePathManagement = () => {
             <th>Report Name</th>
             <th>Source Path</th>
             <th>Output Path</th>
-            <th>Status</th>
-            <th>Created</th>
             <th>Actions</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          {filteredConfigs.length === 0 ? (
+          {paginatedConfigs.length === 0 ? (
             <tr>
-              <td colSpan="6" className="fpm-no-data">
-                No path configurations found
+              <td colSpan="5" className="fpm-no-data">
+                No incoming files found
               </td>
             </tr>
           ) : (
-            filteredConfigs.map((config) => (
-              <tr key={config.id}>
-                <td className="fpm-bold">{config.reportName}</td>
-                <td className="fpm-path">{config.sourcePath}</td>
-                <td className="fpm-path">{config.outputPath}</td>
-                <td>
-                  <span 
-                    className={`fpm-badge ${config.status.toLowerCase()}`}
-                    onClick={() => toggleStatus(config.id)}
-                  >
-                    {config.status}
-                  </span>
-                </td>
-                <td>{new Date(config.createdDate).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    className="fpm-btn-edit"
-                    onClick={() => openModal(config)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="fpm-btn-delete"
-                    onClick={() => openDeleteConfirm(config.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))
+            paginatedConfigs.map((f) => {
+              const st = sendStatus[f.name] || "idle";
+              const isSending = st === "sending";
+              const isSuccess = st === "success";
+              const isError = st.startsWith && st.startsWith("error:");
+              return (
+                <tr key={f.name}>
+                  <td className="fpm-bold">{f.displayName || f.name}</td>
+                  <td className="fpm-path">{f.sourcePath}</td>
+                  <td className="fpm-path">{f.outputPath}</td>
+                  <td>
+                    <button
+                      className={`fpm-btn-primary ${isSuccess ? 'fpm-btn-success' : ''}`}
+                      disabled={isSending || isSuccess}
+                      onClick={() => sendOne(f)}
+                    >
+                      {isSuccess ? 'Sent' : 'Send'}
+                    </button>
+                  </td>
+                  <td>
+                    {isSuccess ? (
+                      <span className="fpm-badge active">ACTIVE</span>
+                    ) : (
+                      <span className="fpm-badge inactive">INACTIVE</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
 
-      {showModal && (
-        <div className="fpm-modal-backdrop" onClick={closeModal}>
-          <div className="fpm-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="fpm-modal-title">
-              {editingConfig ? "Edit Path Configuration" : "Create Path Configuration"}
-            </h2>
-            <input
-              type="text"
-              placeholder="Report Name (e.g., KYC Reports)"
-              className="fpm-input"
-              value={formData.reportName}
-              onChange={(e) =>
-                setFormData({ ...formData, reportName: e.target.value })
-              }
-              autoFocus
-            />
-            <input
-              type="text"
-              placeholder="Source Path (e.g., /incoming/kyc)"
-              className="fpm-input"
-              value={formData.sourcePath}
-              onChange={(e) =>
-                setFormData({ ...formData, sourcePath: e.target.value })
-              }
-            />
-            <input
-              type="text"
-              placeholder="Output Path (e.g., /reports/compliance/kyc)"
-              className="fpm-input"
-              value={formData.outputPath}
-              onChange={(e) =>
-                setFormData({ ...formData, outputPath: e.target.value })
-              }
-            />
-            <select
-              className="fpm-select"
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            <div className="fpm-modal-actions">
-              <button className="fpm-btn-cancel" onClick={closeModal}>
-                Cancel
-              </button>
-              <button className="fpm-btn-primary" onClick={saveConfig}>
-                {editingConfig ? "Update" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="fpm-pagination">
+        <button
+          className="fpm-page-btn"
+          disabled={currentPageSafe === 1}
+          onClick={() => setCurrentPage(Math.max(1, currentPageSafe - 1))}
+        >
+          Previous
+        </button>
 
-      {showDeleteConfirm && (
-        <div className="fpm-modal-backdrop" onClick={closeDeleteConfirm}>
-          <div className="fpm-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="fpm-modal-title">Delete Path Configuration</h2>
-            <p className="fpm-modal-text">
-              Are you sure you want to delete this path configuration? This action cannot be undone.
-            </p>
-            <div className="fpm-modal-actions">
-              <button className="fpm-btn-cancel" onClick={closeDeleteConfirm}>
-                Cancel
-              </button>
-              <button className="fpm-btn-delete" onClick={deleteConfig}>
-                Delete
-              </button>
-            </div>
-          </div>
+        <div className="fpm-page-list">
+          {(() => {
+            const buttons = [];
+            const maxButtons = 7;
+            if (totalPages <= maxButtons) {
+              for (let p = 1; p <= totalPages; p++) {
+                buttons.push(
+                  <button
+                    key={p}
+                    className={`fpm-page-number ${p === currentPageSafe ? "active" : ""}`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+              }
+            } else {
+              const pages = new Set([1, 2, totalPages - 1, totalPages, currentPageSafe - 1, currentPageSafe, currentPageSafe + 1]);
+              const normalized = [...pages].filter(p => p >= 1 && p <= totalPages).sort((a,b) => a - b);
+              let prev = 0;
+              for (const p of normalized) {
+                if (p - prev > 1 && prev !== 0) {
+                  buttons.push(<span key={`ellipsis-${p}`} className="fpm-page-ellipsis">…</span>);
+                }
+                buttons.push(
+                  <button
+                    key={p}
+                    className={`fpm-page-number ${p === currentPageSafe ? "active" : ""}`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+                prev = p;
+              }
+            }
+            return buttons;
+          })()}
         </div>
-      )}
+
+        <button
+          className="fpm-page-btn"
+          disabled={currentPageSafe === totalPages}
+          onClick={() => setCurrentPage(Math.min(totalPages, currentPageSafe + 1))}
+        >
+          Next
+        </button>
+
+        <div className="fpm-page-info">
+          Page {currentPageSafe} of {totalPages} • {totalItems} items
+        </div>
+      </div>
+
+      {/* Modals for CRUD removed in this demo */}
     </div>
   );
 };

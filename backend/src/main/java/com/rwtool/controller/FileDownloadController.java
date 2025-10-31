@@ -1,5 +1,7 @@
 package com.rwtool.controller;
 
+import com.rwtool.service.AuditLogService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -24,6 +26,9 @@ public class FileDownloadController {
 
     @Value("${app.storage.local.baseDir:}")
     private String localBaseDir;
+    
+    @Autowired
+    private AuditLogService auditLogService;
 
     /**
      * Download a file from a specific folder
@@ -61,12 +66,28 @@ public class FileDownloadController {
                 contentType = "text/csv";
             }
             
+            // Log successful file download
+            auditLogService.logActivity(
+                "system", // TODO: Get actual user email from security context
+                "Subscriber",
+                "FILE_DOWNLOADED",
+                "Downloaded file: " + fileName + " from folder: " + folder,
+                "success"
+            );
+            
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .body(resource);
                     
         } catch (Exception e) {
+            auditLogService.logActivity(
+                "system",
+                "Subscriber",
+                "FILE_DOWNLOAD_FAILED",
+                "Failed to download file: " + fileName + " from folder: " + folder + ". Error: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.internalServerError().build();
         }
     }

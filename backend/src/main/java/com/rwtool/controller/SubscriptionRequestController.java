@@ -4,6 +4,7 @@ import com.rwtool.dto.ApprovalDecisionDTO;
 import com.rwtool.dto.SubscriptionRequestDTO;
 import com.rwtool.model.SubscriptionRequest;
 import com.rwtool.service.SubscriptionRequestService;
+import com.rwtool.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,9 @@ public class SubscriptionRequestController {
 
     @Autowired
     private SubscriptionRequestService subscriptionRequestService;
+    
+    @Autowired
+    private AuditLogService auditLogService;
 
     // Get all subscription requests (for admin)
     @GetMapping
@@ -68,8 +72,22 @@ public class SubscriptionRequestController {
     public ResponseEntity<?> createRequest(@RequestBody SubscriptionRequestDTO requestDTO) {
         try {
             SubscriptionRequest request = subscriptionRequestService.createRequest(requestDTO);
+            auditLogService.logActivity(
+                request.getUserEmail(),
+                "Subscriber",
+                "SUBSCRIPTION_REQUESTED",
+                "User requested subscription for domain: " + request.getDomainName(),
+                "success"
+            );
             return ResponseEntity.status(HttpStatus.CREATED).body(request);
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                requestDTO.getUserEmail() != null ? requestDTO.getUserEmail() : "unknown",
+                "Subscriber",
+                "SUBSCRIPTION_REQUEST_FAILED",
+                "Failed to create subscription request: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
@@ -92,8 +110,23 @@ public class SubscriptionRequestController {
     public ResponseEntity<?> approveRequest(@PathVariable String id) {
         try {
             SubscriptionRequest request = subscriptionRequestService.approveRequest(id);
+            // TODO: Get actual admin email from security context
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_APPROVED",
+                "Approved subscription request for " + request.getUserEmail(),
+                "success"
+            );
             return ResponseEntity.ok(request);
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_APPROVAL_FAILED",
+                "Failed to approve subscription request: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
@@ -106,8 +139,23 @@ public class SubscriptionRequestController {
         try {
             String reason = decision.getRejectionReason();
             SubscriptionRequest request = subscriptionRequestService.rejectRequest(id, reason);
+            // TODO: Get actual admin email from security context
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_REJECTED",
+                "Rejected subscription request for " + request.getUserEmail() + ". Reason: " + reason,
+                "success"
+            );
             return ResponseEntity.ok(request);
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_REJECTION_FAILED",
+                "Failed to reject subscription request: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }

@@ -2,6 +2,7 @@ package com.rwtool.controller;
 
 import com.rwtool.model.Domain;
 import com.rwtool.service.DomainService;
+import com.rwtool.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,9 @@ public class DomainController {
 
     @Autowired
     private DomainService domainService;
+    
+    @Autowired
+    private AuditLogService auditLogService;
 
     @GetMapping
     public ResponseEntity<List<Domain>> getAllDomains() {
@@ -41,8 +45,22 @@ public class DomainController {
     public ResponseEntity<?> addDomain(@RequestBody Domain domain) {
         try {
             Domain savedDomain = domainService.addDomain(domain);
+            auditLogService.logActivity(
+                "system", // TODO: Get actual admin email from security context
+                "Admin",
+                "DOMAIN_ADDED",
+                "Added new domain: " + savedDomain.getName(),
+                "success"
+            );
             return ResponseEntity.status(HttpStatus.CREATED).body(savedDomain);
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "DOMAIN_ADD_FAILED",
+                "Failed to add domain: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
@@ -51,8 +69,22 @@ public class DomainController {
     public ResponseEntity<?> updateDomain(@PathVariable String id, @RequestBody Domain domain) {
         try {
             Domain updatedDomain = domainService.updateDomain(id, domain);
+            auditLogService.logActivity(
+                "system", // TODO: Get actual admin email from security context
+                "Admin",
+                "DOMAIN_UPDATED",
+                "Updated domain: " + updatedDomain.getName(),
+                "success"
+            );
             return ResponseEntity.ok(updatedDomain);
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "DOMAIN_UPDATE_FAILED",
+                "Failed to update domain: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
@@ -60,9 +92,26 @@ public class DomainController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteDomain(@PathVariable String id) {
         try {
+            // Get domain name before deletion for audit log
+            Domain domain = domainService.getDomainById(id);
+            String domainName = domain.getName();
             domainService.deleteDomain(id);
+            auditLogService.logActivity(
+                "system", // TODO: Get actual admin email from security context
+                "Admin",
+                "DOMAIN_DELETED",
+                "Deleted domain: " + domainName,
+                "success"
+            );
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "DOMAIN_DELETE_FAILED",
+                "Failed to delete domain: " + e.getMessage(),
+                "failed"
+            );
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }

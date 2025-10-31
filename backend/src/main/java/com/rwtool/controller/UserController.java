@@ -19,6 +19,17 @@ public class UserController {
         this.userRepository = userRepository;
     }
 
+    @GetMapping("/count")
+    public ResponseEntity<Map<String, Object>> getUserCount() {
+        try {
+            long count = userRepository.count();
+            return ResponseEntity.ok(Map.of("count", count));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to get user count", "message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{email:.+}")
     public ResponseEntity<?> getByEmail(@PathVariable String email) {
         return userRepository.findByEmail(email)

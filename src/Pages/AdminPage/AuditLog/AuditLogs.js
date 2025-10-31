@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Clock, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './AuditLogs.css';
+import axios from 'axios';
 
 const AuditLogs = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -10,36 +11,118 @@ const AuditLogs = () => {
   const [dateRange, setDateRange] = useState('7days');
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 10;
+  const [auditData, setAuditData] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [availableActions, setAvailableActions] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
 
-  // Replace with your API call
-  const auditData = [
-    { id: 1, timestamp: '2024-01-10 14:32:15', user: 'admin@rwtool.com', role: 'Admin', action: 'USER_APPROVED', details: 'Approved subscription request for john.doe@example.com', status: 'success' },
-    { id: 2, timestamp: '2024-01-10 14:28:43', user: 'admin@rwtool.com', role: 'Admin', action: 'REPORT_UPLOAD', details: 'Uploaded Q4 Financial Report', status: 'success' },
-    { id: 3, timestamp: '2024-01-10 14:15:22', user: 'jane.smith@rwtool.com', role: 'Subscriber', action: 'REPORT_VIEW', details: 'Viewed Financial Report Q3 2024', status: 'success' },
-    { id: 4, timestamp: '2024-01-10 13:45:11', user: 'unknown', role: 'Subscriber', action: 'LOGIN_FAILED', details: 'Failed login attempt', status: 'failed' },
-    { id: 5, timestamp: '2024-01-10 13:30:22', user: 'admin@rwtool.com', role: 'Admin', action: 'USER_REJECTED', details: 'Rejected subscription request for inactive user', status: 'success' },
-    { id: 6, timestamp: '2024-01-10 12:55:33', user: 'subscriber@rwtool.com', role: 'Subscriber', action: 'REPORT_DOWNLOAD', details: 'Downloaded Operations Report July 2024', status: 'success' },
-    { id: 7, timestamp: '2024-01-10 12:20:15', user: 'john.doe@rwtool.com', role: 'Subscriber', action: 'USER_LOGIN', details: 'User logged in successfully', status: 'success' },
-    { id: 8, timestamp: '2024-01-10 11:45:00', user: 'admin@rwtool.com', role: 'Admin', action: 'DOMAIN_ADDED', details: 'Added new domain: marketing.reports.com', status: 'success' },
-    { id: 9, timestamp: '2024-01-10 11:30:15', user: 'subscriber2@rwtool.com', role: 'Subscriber', action: 'REPORT_VIEW', details: 'Viewed Marketing Report Q2 2024', status: 'success' },
-    { id: 10, timestamp: '2024-01-10 11:15:45', user: 'admin@rwtool.com', role: 'Admin', action: 'USER_APPROVED', details: 'Approved subscription request for alice@example.com', status: 'success' },
-    { id: 11, timestamp: '2024-01-10 10:55:30', user: 'subscriber3@rwtool.com', role: 'Subscriber', action: 'REPORT_DOWNLOAD', details: 'Downloaded HR Report June 2024', status: 'success' },
-    { id: 12, timestamp: '2024-01-10 10:40:20', user: 'admin@rwtool.com', role: 'Admin', action: 'REPORT_UPLOAD', details: 'Uploaded Annual Financial Statement', status: 'success' }
-  ];
+  // API base URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
-  const filteredData = auditData.filter(log => {
-    const matchesSearch = log.user.toLowerCase().includes(searchTerm.toLowerCase()) || log.details.toLowerCase().includes(searchTerm.toLowerCase()) || log.action.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesAction = filterAction === 'All Actions' || log.action === filterAction;
-    const matchesRole = filterRole === 'All Users' || log.role === filterRole;
-    return matchesSearch && matchesAction && matchesRole;
-  });
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
 
+  // API call to fetch audit logs
+  const fetchAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const params = {
+        page: currentPage - 1, // Backend uses 0-based indexing
+        size: recordsPerPage,
+        dateRange: dateRange,
+        searchTerm: searchTerm || undefined,
+        action: filterAction !== 'All Actions' ? filterAction : undefined,
+        role: filterRole !== 'All Users' ? filterRole : undefined
+      };
+
+      const response = await axios.get(`${API_BASE_URL}/audit/logs`, {
+        params,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data) {
+        setAuditData(response.data.content || []);
+        setTotalPages(response.data.totalPages || 0);
+        setTotalRecords(response.data.totalElements || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      setAuditData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // API call to fetch recent activity
+  const fetchRecentActivity = async () => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(`${API_BASE_URL}/audit/recent`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data) {
+        setRecentActivity(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      setRecentActivity([]);
+    }
+  };
+
+  // API call to fetch available actions and roles for filters
+  const fetchFilterOptions = async () => {
+    try {
+      const token = getAuthToken();
+      const [actionsResponse, rolesResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/audit/actions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/audit/roles`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      setAvailableActions(['All Actions', ...(actionsResponse.data || [])]);
+      setAvailableRoles(['All Users', ...(rolesResponse.data || [])]);
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+      // Set minimal default options if API fails
+      setAvailableActions(['All Actions']);
+      setAvailableRoles(['All Users']);
+    }
+  };
+
+  // Calculate pagination info
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
-  const currentRecords = filteredData.slice(indexOfFirstRecord, indexOfLastRecord);
-  const totalPages = Math.ceil(filteredData.length / recordsPerPage);
+  const currentRecords = auditData; // Data is already paginated from backend
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterAction, filterRole, dateRange]);
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchFilterOptions();
+    fetchRecentActivity();
+  }, []);
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [currentPage, searchTerm, filterAction, filterRole, dateRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAction, filterRole, dateRange]);
 
   return (
     <div className="audit-logs-container">
@@ -62,7 +145,14 @@ const AuditLogs = () => {
           Recent Activity
         </h5>
         <div className="timeline">
-          {auditData.slice(0, 5).map(activity => (
+          {loading ? (
+            <div className="text-center py-3">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          ) : recentActivity.length > 0 ? (
+            recentActivity.slice(0, 5).map(activity => (
             <div key={activity.id} className="timeline-item">
               <div className="timeline-dot"></div>
               <div className="timeline-content">
@@ -74,7 +164,12 @@ const AuditLogs = () => {
                 <div className="timeline-user">{activity.user}</div>
               </div>
             </div>
-          ))}
+          ))
+          ) : (
+            <div className="text-center text-muted py-3">
+              No recent activity found
+            </div>
+          )}
         </div>
       </div>
 
@@ -83,50 +178,14 @@ const AuditLogs = () => {
         <div className="mb-4">
           <h4 className="activity-title">Activity Log</h4>
           <p className="activity-subtitle mb-3">Complete audit trail of system activities</p>
-          {(filterAction !== 'All Actions' || filterRole !== 'All Users') && (
-            <div className="mb-3">
-              <small className="text-muted me-2">Active Filters:</small>
-              {filterAction !== 'All Actions' && <span className="filter-chip">{filterAction}</span>}
-              {filterRole !== 'All Users' && <span className="filter-chip">{filterRole}</span>}
-            </div>
-          )}
         </div>
 
-        {/* Filters */}
-        <div className="row g-3 mb-4">
-          <div className="col-md-2">
-            <select className="form-select" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-              {['All Users', 'Admin', 'Subscriber'].map(opt => <option key={opt}>{opt}</option>)}
-            </select>
-          </div>
-          <div className="col-md-3">
-            <select className="form-select" value={filterAction} onChange={e => setFilterAction(e.target.value)}>
-              {['All Actions', 'USER_APPROVED', 'USER_REJECTED', 'REPORT_UPLOAD', 'REPORT_VIEW', 'REPORT_DOWNLOAD', 'USER_LOGIN', 'LOGIN_FAILED', 'DOMAIN_ADDED'].map(opt => <option key={opt}>{opt}</option>)}
-            </select>
-          </div>
-          <div className="col-md-2">
-            <select className="form-select" value={dateRange} onChange={e => setDateRange(e.target.value)}>
-              {[{v:'today',l:'Today'},{v:'7days',l:'Last 7 Days'},{v:'30days',l:'Last 30 Days'},{v:'90days',l:'Last 90 Days'}].map(opt => <option key={opt.v} value={opt.v}>{opt.l}</option>)}
-            </select>
-          </div>
-          <div className="col-md-4">
-            <div className="input-group">
-              <span className="input-group-text bg-white border-end-0">
-                <Search size={18} className="text-muted" />
-              </span>
-              <input type="text" className="form-control border-start-0" placeholder="Search by user, action, or details..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            </div>
-          </div>
-          <div className="col-md-1">
-            <button className="btn btn-outline-secondary w-100" title="Advanced Filters">
-              <Filter size={18} />
-            </button>
-          </div>
-        </div>
 
         {/* Table Info */}
         <div className="mb-3 d-flex justify-content-between">
-          <small className="text-muted">Showing {indexOfFirstRecord + 1} to {Math.min(indexOfLastRecord, filteredData.length)} of {filteredData.length} records</small>
+          <small className="text-muted">
+            {loading ? 'Loading...' : `Showing ${Math.min(indexOfFirstRecord + 1, totalRecords)} to ${Math.min(indexOfLastRecord, totalRecords)} of ${totalRecords} records`}
+          </small>
           <small className="text-muted">Page {currentPage} of {totalPages || 1}</small>
         </div>
 
@@ -137,18 +196,34 @@ const AuditLogs = () => {
               <tr>{['Timestamp', 'User', 'Role', 'Action', 'Details', 'Status'].map(h => <th key={h}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {currentRecords.map(log => (
-                <tr key={log.id}>
-                  <td className="text-muted">{log.timestamp}</td>
-                  <td className="fw-semibold">{log.user}</td>
-                  <td><span className={`role-badge ${log.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{log.role}</span></td>
-                  <td><span className="action-badge">{log.action}</span></td>
-                  <td>{log.details}</td>
-                  <td>
-                    <span className={`status-badge status-${log.status}`}>{log.status}</span>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : currentRecords.length > 0 ? (
+                currentRecords.map(log => (
+                  <tr key={log.id}>
+                    <td className="text-muted">{log.timestamp}</td>
+                    <td className="fw-semibold">{log.user}</td>
+                    <td><span className={`role-badge ${log.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{log.role}</span></td>
+                    <td><span className="action-badge">{log.action}</span></td>
+                    <td>{log.details}</td>
+                    <td>
+                      <span className={`status-badge status-${log.status}`}>{log.status}</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="text-center py-4 text-muted">
+                    No audit logs found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
