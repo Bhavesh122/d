@@ -1,113 +1,252 @@
-package com.rwtool.controller;
+import React, { useState, useEffect } from 'react';
+import { Download, Clock, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './AuditLogs.css';
+import axios from 'axios';
 
-import com.rwtool.dto.AuthResponse;
-import com.rwtool.dto.LoginRequest;
-import com.rwtool.dto.SignupRequest;
-import com.rwtool.service.AuthService;
-import com.rwtool.service.AuditLogService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+const AuditLogs = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterAction, setFilterAction] = useState('All Actions');
+  const [filterRole, setFilterRole] = useState('All Users');
+  const [dateRange, setDateRange] = useState('7days');
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 10;
+  const [auditData, setAuditData] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [availableActions, setAvailableActions] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
 
-import java.util.HashMap;
-import java.util.Map;
+  // API base URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
-@RestController
-@RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:3000")
-@Tag(name = "Authentication", description = "Authentication management APIs")
-public class AuthController {
-    
-    @Autowired
-    private AuthService authService;
-    
-    @Autowired
-    private AuditLogService auditLogService;
-    
-    @Operation(summary = "Register a new user", description = "Create a new user account")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "User created successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid input or email already exists")
-    })
-    @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
-        try {
-            AuthResponse response = authService.signup(request);
-            auditLogService.logActivity(
-                request.getEmail(), 
-                "Subscriber", 
-                "USER_SIGNUP", 
-                "User signed up successfully", 
-                "success"
-            );
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            auditLogService.logActivity(
-                request.getEmail(), 
-                "Subscriber", 
-                "USER_SIGNUP", 
-                "Failed signup attempt: " + e.getMessage(), 
-                "failed"
-            );
-            throw e;
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // API call to fetch audit logs
+  const fetchAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const params = {
+        page: currentPage - 1, // Backend uses 0-based indexing
+        size: recordsPerPage,
+        dateRange: dateRange,
+        searchTerm: searchTerm || undefined,
+        action: filterAction !== 'All Actions' ? filterAction : undefined,
+        role: filterRole !== 'All Users' ? filterRole : undefined
+      };
+
+      const response = await axios.get(`${API_BASE_URL}/audit/logs`, {
+        params,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
+
+      if (response.data) {
+        setAuditData(response.data.content || []);
+        setTotalPages(response.data.totalPages || 0);
+        setTotalRecords(response.data.totalElements || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      setAuditData([]);
+    } finally {
+      setLoading(false);
     }
-    
-    @Operation(summary = "Login user", description = "Authenticate user and return JWT token")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Login successful"),
-        @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    })
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        try {
-            AuthResponse response = authService.login(request);
-            auditLogService.logActivity(
-                request.getEmail(), 
-                response.getRole(), 
-                "USER_LOGIN", 
-                "User logged in successfully", 
-                "success"
-            );
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            auditLogService.logActivity(
-                request.getEmail(), 
-                "Unknown", 
-                "LOGIN_FAILED", 
-                "Failed login attempt: " + e.getMessage(), 
-                "failed"
-            );
-            throw e;
+  };
+
+  // API call to fetch recent activity
+  const fetchRecentActivity = async () => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(`${API_BASE_URL}/audit/recent`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
+
+      if (response.data) {
+        setRecentActivity(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      setRecentActivity([]);
     }
-    
-    @Operation(summary = "Get total user count", description = "Get total")
-    @ApiResponse(responseCode = "200", description = "Users count retrieved")
-    @GetMapping("/users/count")
-    public ResponseEntity<Map<String, Long>> getUsersCount() {
-        try {
-            Long count = authService.getTotalUserCount();
-            Map<String, Long> response = new HashMap<>();
-            response.put("count", count);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Long> errorResponse = new HashMap<>();
-            errorResponse.put("count", 0L);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
+  };
+
+  // API call to fetch available actions and roles for filters
+  const fetchFilterOptions = async () => {
+    try {
+      const token = getAuthToken();
+      const [actionsResponse, rolesResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/audit/actions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/audit/roles`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      setAvailableActions(['All Actions', ...(actionsResponse.data || [])]);
+      setAvailableRoles(['All Users', ...(rolesResponse.data || [])]);
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+      // Set minimal default options if API fails
+      setAvailableActions(['All Actions']);
+      setAvailableRoles(['All Users']);
     }
-    
-    @Operation(summary = "Health check", description = "Check if the authentication service is running")
-    @ApiResponse(responseCode = "200", description = "Service is healthy")
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Auth service is running");
-    }
-}
+  };
+
+  // Calculate pagination info
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = auditData; // Data is already paginated from backend
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchFilterOptions();
+    fetchRecentActivity();
+  }, []);
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [currentPage, searchTerm, filterAction, filterRole, dateRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAction, filterRole, dateRange]);
+
+  return (
+    <div className="audit-logs-container">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+        <div>
+          <h2 className="audit-title">Audit Logs</h2>
+          <p className="audit-subtitle">Monitor all admin and subscriber activities in real-time</p>
+        </div>
+        <button className="btn btn-export">
+          <Download size={18} className="me-2" />
+          Export Logs
+        </button>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="info-card mb-4">
+        <h5 className="card-header-title">
+          <Clock size={20} className="me-2" />
+          Recent Activity
+        </h5>
+        <div className="timeline">
+          {loading ? (
+            <div className="text-center py-3">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          ) : recentActivity.length > 0 ? (
+            recentActivity.slice(0, 5).map(activity => (
+            <div key={activity.id} className="timeline-item">
+              <div className="timeline-dot"></div>
+              <div className="timeline-content">
+                <div className="d-flex justify-content-between mb-1">
+                  <span className={`role-badge-small ${activity.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{activity.role}</span>
+                  <small className="text-muted">{activity.timestamp.split(' ')[1]}</small>
+                </div>
+                <div className="timeline-action">{activity.action}</div>
+                <div className="timeline-user">{activity.user}</div>
+              </div>
+            </div>
+          ))
+          ) : (
+            <div className="text-center text-muted py-3">
+              No recent activity found
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Log */}
+      <div className="activity-section">
+        <div className="mb-4">
+          <h4 className="activity-title">Activity Log</h4>
+          <p className="activity-subtitle mb-3">Complete audit trail of system activities</p>
+        </div>
+
+
+        {/* Table Info */}
+        <div className="mb-3 d-flex justify-content-between">
+          <small className="text-muted">
+            {loading ? 'Loading...' : `Showing ${Math.min(indexOfFirstRecord + 1, totalRecords)} to ${Math.min(indexOfLastRecord, totalRecords)} of ${totalRecords} records`}
+          </small>
+          <small className="text-muted">Page {currentPage} of {totalPages || 1}</small>
+        </div>
+
+        {/* Table */}
+        <div className="table-responsive">
+          <table className="table audit-table">
+            <thead>
+              <tr>{['Timestamp', 'User', 'Role', 'Action', 'Details', 'Status'].map(h => <th key={h}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentRecords.length > 0 ? (
+                currentRecords.map(log => (
+                  <tr key={log.id}>
+                    <td className="text-muted">{log.timestamp}</td>
+                    <td className="fw-semibold">{log.user}</td>
+                    <td><span className={`role-badge ${log.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{log.role}</span></td>
+                    <td><span className="action-badge">{log.action}</span></td>
+                    <td>{log.details}</td>
+                    <td>
+                      <span className={`status-badge status-${log.status}`}>{log.status}</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="text-center py-4 text-muted">
+                    No audit logs found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <button className="btn btn-pagination" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+            <ChevronLeft size={18} className="me-1" />
+            Previous
+          </button>
+          <div className="pagination-info">
+            <span className="page-number">{currentPage}</span>
+            <span className="text-muted mx-2">of</span>
+            <span className="page-number">{totalPages || 1}</span>
+          </div>
+          <button className="btn btn-pagination" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages || totalPages === 0}>
+            Next
+            <ChevronRight size={18} className="ms-1" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AuditLogs;
