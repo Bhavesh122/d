@@ -1,0 +1,1057 @@
+AuditLog.java
+
+package com.rwtool.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "audit_logs")
+public class AuditLog {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false)
+    private LocalDateTime timestamp;
+    
+    @Column(nullable = false)
+    private String userEmail;
+    
+    @Column(nullable = false)
+    private String role;
+    
+    @Column(nullable = false)
+    private String action;
+    
+    @Column(columnDefinition = "TEXT")
+    private String details;
+    
+    @Column(nullable = false)
+    private String status;
+    
+    
+    // Constructors
+    public AuditLog() {
+        this.timestamp = LocalDateTime.now();
+    }
+    
+    public AuditLog(String userEmail, String role, String action, String details, String status) {
+        this();
+        this.userEmail = userEmail;
+        this.role = role;
+        this.action = action;
+        this.details = details;
+        this.status = status;
+    }
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+    
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
+    }
+    
+    public String getUserEmail() {
+        return userEmail;
+    }
+    
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+    
+    public String getRole() {
+        return role;
+    }
+    
+    public void setRole(String role) {
+        this.role = role;
+    }
+    
+    public String getAction() {
+        return action;
+    }
+    
+    public void setAction(String action) {
+        this.action = action;
+    }
+    
+    public String getDetails() {
+        return details;
+    }
+    
+    public void setDetails(String details) {
+        this.details = details;
+    }
+    
+    public String getStatus() {
+        return status;
+    }
+    
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    
+}
+
+AuditLogrepository.java
+package com.rwtool.repository;
+
+import com.rwtool.model.AuditLog;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Repository
+public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+    
+    // Find logs by user email
+    List<AuditLog> findByUserEmailContainingIgnoreCase(String userEmail);
+    
+    // Find logs by action
+    List<AuditLog> findByAction(String action);
+    
+    // Find logs by role
+    List<AuditLog> findByRole(String role);
+    
+    // Find logs by status
+    List<AuditLog> findByStatus(String status);
+    
+    // Find logs within date range
+    List<AuditLog> findByTimestampBetween(LocalDateTime startDate, LocalDateTime endDate);
+    
+    // Find recent logs (limit)
+    List<AuditLog> findTop10ByOrderByTimestampDesc();
+    
+    // Complex search with filters
+    @Query("SELECT a FROM AuditLog a WHERE " +
+           "(:userEmail IS NULL OR LOWER(a.userEmail) LIKE LOWER(CONCAT('%', :userEmail, '%'))) AND " +
+           "(:action IS NULL OR a.action = :action) AND " +
+           "(:role IS NULL OR a.role = :role) AND " +
+           "(:status IS NULL OR a.status = :status) AND " +
+           "(:startDate IS NULL OR a.timestamp >= :startDate) AND " +
+           "(:endDate IS NULL OR a.timestamp <= :endDate) AND " +
+           "(:searchTerm IS NULL OR LOWER(a.details) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(a.userEmail) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(a.action) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    Page<AuditLog> findWithFilters(@Param("userEmail") String userEmail,
+                                   @Param("action") String action,
+                                   @Param("role") String role,
+                                   @Param("status") String status,
+                                   @Param("startDate") LocalDateTime startDate,
+                                   @Param("endDate") LocalDateTime endDate,
+                                   @Param("searchTerm") String searchTerm,
+                                   Pageable pageable);
+}
+
+AuditLogService.java
+
+package com.rwtool.service;
+
+import com.rwtool.dto.AuditLogDTO;
+import com.rwtool.dto.PageResponse;
+import com.rwtool.model.AuditLog;
+import com.rwtool.repository.AuditLogRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class AuditLogService {
+    
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+    
+    // Create audit log entry
+    public void logActivity(String userEmail, String role, String action, String details, String status) {
+        AuditLog auditLog = new AuditLog(userEmail, role, action, details, status);
+        auditLogRepository.save(auditLog);
+    }
+    
+    
+    // Get recent activity (last 10 entries)
+    public List<AuditLogDTO> getRecentActivity() {
+        List<AuditLog> recentLogs = auditLogRepository.findTop10ByOrderByTimestampDesc();
+        return recentLogs.stream()
+                .map(AuditLogDTO::new)
+                .collect(Collectors.toList());
+    }
+    
+    // Get paginated audit logs with filters
+    public PageResponse<AuditLogDTO> getAuditLogs(String userEmail, String action, String role, 
+                                                  String status, String dateRange, String searchTerm,
+                                                  int page, int size) {
+        
+        // Calculate date range
+        LocalDateTime startDate = null;
+        LocalDateTime endDate = LocalDateTime.now();
+        
+        if (dateRange != null) {
+            switch (dateRange) {
+                case "today":
+                    startDate = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "7days":
+                    startDate = LocalDateTime.now().minusDays(7);
+                    break;
+                case "30days":
+                    startDate = LocalDateTime.now().minusDays(30);
+                    break;
+                case "90days":
+                    startDate = LocalDateTime.now().minusDays(90);
+                    break;
+            }
+        }
+        
+        // Convert filter values
+        String filterUserEmail = (userEmail != null && !userEmail.equals("All Users")) ? userEmail : null;
+        String filterAction = (action != null && !action.equals("All Actions")) ? action : null;
+        String filterRole = (role != null && !role.equals("All Users")) ? role : null;
+        String filterStatus = (status != null && !status.equals("All Status")) ? status : null;
+        String filterSearchTerm = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : null;
+        
+        // Create pageable with sorting by timestamp descending
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+        
+        // Get filtered results
+        Page<AuditLog> auditLogPage = auditLogRepository.findWithFilters(
+                filterUserEmail, filterAction, filterRole, filterStatus, 
+                startDate, endDate, filterSearchTerm, pageable);
+        
+        // Convert to DTOs
+        List<AuditLogDTO> auditLogDTOs = auditLogPage.getContent().stream()
+                .map(AuditLogDTO::new)
+                .collect(Collectors.toList());
+        
+        return new PageResponse<>(
+                auditLogDTOs,
+                auditLogPage.getNumber(),
+                auditLogPage.getSize(),
+                auditLogPage.getTotalElements(),
+                auditLogPage.getTotalPages(),
+                auditLogPage.isFirst(),
+                auditLogPage.isLast()
+        );
+    }
+    
+    // Get all unique actions for filter dropdown
+    public List<String> getAllActions() {
+        return auditLogRepository.findAll().stream()
+                .map(AuditLog::getAction)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+    
+    // Get all unique roles for filter dropdown
+    public List<String> getAllRoles() {
+        return auditLogRepository.findAll().stream()
+                .map(AuditLog::getRole)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+}
+
+AuditLogDTO
+
+package com.rwtool.dto;
+
+import com.rwtool.model.AuditLog;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class AuditLogDTO {
+    
+    private Long id;
+    private String timestamp;
+    private String user;
+    private String role;
+    private String action;
+    private String details;
+    private String status;
+    
+    // Constructors
+    public AuditLogDTO() {}
+    
+    public AuditLogDTO(AuditLog auditLog) {
+        this.id = auditLog.getId();
+        this.timestamp = auditLog.getTimestamp().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        this.user = auditLog.getUserEmail();
+        this.role = auditLog.getRole();
+        this.action = auditLog.getAction();
+        this.details = auditLog.getDetails();
+        this.status = auditLog.getStatus();
+    }
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public String getTimestamp() {
+        return timestamp;
+    }
+    
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
+    }
+    
+    public String getUser() {
+        return user;
+    }
+    
+    public void setUser(String user) {
+        this.user = user;
+    }
+    
+    public String getRole() {
+        return role;
+    }
+    
+    public void setRole(String role) {
+        this.role = role;
+    }
+    
+    public String getAction() {
+        return action;
+    }
+    
+    public void setAction(String action) {
+        this.action = action;
+    }
+    
+    public String getDetails() {
+        return details;
+    }
+    
+    public void setDetails(String details) {
+        this.details = details;
+    }
+    
+    public String getStatus() {
+        return status;
+    }
+    
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    
+}
+
+AuditLogController.java
+
+package com.rwtool.controller;
+
+import com.rwtool.dto.AuditLogDTO;
+import com.rwtool.dto.PageResponse;
+import com.rwtool.service.AuditLogService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/audit")
+@CrossOrigin(origins = "*")
+public class AuditLogController {
+    
+    @Autowired
+    private AuditLogService auditLogService;
+    
+    // Get recent activity (last 10 entries)
+    @GetMapping("/recent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<AuditLogDTO>> getRecentActivity() {
+        try {
+            List<AuditLogDTO> recentActivity = auditLogService.getRecentActivity();
+            return ResponseEntity.ok(recentActivity);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // Get paginated audit logs with filters
+    @GetMapping("/logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PageResponse<AuditLogDTO>> getAuditLogs(
+            @RequestParam(required = false) String userEmail,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "7days") String dateRange,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        try {
+            PageResponse<AuditLogDTO> auditLogs = auditLogService.getAuditLogs(
+                    userEmail, action, role, status, dateRange, searchTerm, page, size);
+            return ResponseEntity.ok(auditLogs);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // Get all unique actions for filter dropdown
+    @GetMapping("/actions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<String>> getAllActions() {
+        try {
+            List<String> actions = auditLogService.getAllActions();
+            return ResponseEntity.ok(actions);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // Get all unique roles for filter dropdown
+    @GetMapping("/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<String>> getAllRoles() {
+        try {
+            List<String> roles = auditLogService.getAllRoles();
+            return ResponseEntity.ok(roles);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // Manual log entry (for testing or manual entries)
+    @PostMapping("/log")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> createAuditLog(
+            @RequestParam String userEmail,
+            @RequestParam String role,
+            @RequestParam String action,
+            @RequestParam String details,
+            @RequestParam String status) {
+        
+        try {
+            auditLogService.logActivity(userEmail, role, action, details, status);
+            return ResponseEntity.ok("Audit log created successfully");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to create audit log");
+        }
+    }
+}
+
+auditlogs.js
+import React, { useState, useEffect } from 'react';
+import { Download, Clock, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './AuditLogs.css';
+import axios from 'axios';
+
+const AuditLogs = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterAction, setFilterAction] = useState('All Actions');
+  const [filterRole, setFilterRole] = useState('All Users');
+  const [dateRange, setDateRange] = useState('7days');
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 10;
+  const [auditData, setAuditData] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [availableActions, setAvailableActions] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
+
+  // API base URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // API call to fetch audit logs
+  const fetchAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const token = getAuthToken();
+      const params = {
+        page: currentPage - 1, // Backend uses 0-based indexing
+        size: recordsPerPage,
+        dateRange: dateRange,
+        searchTerm: searchTerm || undefined,
+        action: filterAction !== 'All Actions' ? filterAction : undefined,
+        role: filterRole !== 'All Users' ? filterRole : undefined
+      };
+
+      const response = await axios.get(`${API_BASE_URL}/audit/logs`, {
+        params,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data) {
+        setAuditData(response.data.content || []);
+        setTotalPages(response.data.totalPages || 0);
+        setTotalRecords(response.data.totalElements || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      setAuditData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // API call to fetch recent activity
+  const fetchRecentActivity = async () => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(`${API_BASE_URL}/audit/recent`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data) {
+        setRecentActivity(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      setRecentActivity([]);
+    }
+  };
+
+  // API call to fetch available actions and roles for filters
+  const fetchFilterOptions = async () => {
+    try {
+      const token = getAuthToken();
+      const [actionsResponse, rolesResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/audit/actions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/audit/roles`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      setAvailableActions(['All Actions', ...(actionsResponse.data || [])]);
+      setAvailableRoles(['All Users', ...(rolesResponse.data || [])]);
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+      // Set minimal default options if API fails
+      setAvailableActions(['All Actions']);
+      setAvailableRoles(['All Users']);
+    }
+  };
+
+  // Calculate pagination info
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = auditData; // Data is already paginated from backend
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchFilterOptions();
+    fetchRecentActivity();
+  }, []);
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [currentPage, searchTerm, filterAction, filterRole, dateRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAction, filterRole, dateRange]);
+
+  return (
+    <div className="audit-logs-container">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+        <div>
+          <h2 className="audit-title">Audit Logs</h2>
+          <p className="audit-subtitle">Monitor all admin and subscriber activities in real-time</p>
+        </div>
+        <button className="btn btn-export">
+          <Download size={18} className="me-2" />
+          Export Logs
+        </button>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="info-card mb-4">
+        <h5 className="card-header-title">
+          <Clock size={20} className="me-2" />
+          Recent Activity
+        </h5>
+        <div className="timeline">
+          {loading ? (
+            <div className="text-center py-3">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          ) : recentActivity.length > 0 ? (
+            recentActivity.slice(0, 5).map(activity => (
+            <div key={activity.id} className="timeline-item">
+              <div className="timeline-dot"></div>
+              <div className="timeline-content">
+                <div className="d-flex justify-content-between mb-1">
+                  <span className={`role-badge-small ${activity.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{activity.role}</span>
+                  <small className="text-muted">{activity.timestamp.split(' ')[1]}</small>
+                </div>
+                <div className="timeline-action">{activity.action}</div>
+                <div className="timeline-user">{activity.user}</div>
+              </div>
+            </div>
+          ))
+          ) : (
+            <div className="text-center text-muted py-3">
+              No recent activity found
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Log */}
+      <div className="activity-section">
+        <div className="mb-4">
+          <h4 className="activity-title">Activity Log</h4>
+          <p className="activity-subtitle mb-3">Complete audit trail of system activities</p>
+          {(filterAction !== 'All Actions' || filterRole !== 'All Users') && (
+            <div className="mb-3">
+              <small className="text-muted me-2">Active Filters:</small>
+              {filterAction !== 'All Actions' && <span className="filter-chip">{filterAction}</span>}
+              {filterRole !== 'All Users' && <span className="filter-chip">{filterRole}</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div className="row g-3 mb-4">
+          <div className="col-md-2">
+            <select className="form-select" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+              {availableRoles.map(opt => <option key={opt}>{opt}</option>)}
+            </select>
+          </div>
+          <div className="col-md-3">
+            <select className="form-select" value={filterAction} onChange={e => setFilterAction(e.target.value)}>
+              {availableActions.map(opt => <option key={opt}>{opt}</option>)}
+            </select>
+          </div>
+          <div className="col-md-2">
+            <select className="form-select" value={dateRange} onChange={e => setDateRange(e.target.value)}>
+              {[{v:'today',l:'Today'},{v:'7days',l:'Last 7 Days'},{v:'30days',l:'Last 30 Days'},{v:'90days',l:'Last 90 Days'}].map(opt => <option key={opt.v} value={opt.v}>{opt.l}</option>)}
+            </select>
+          </div>
+          <div className="col-md-4">
+            <div className="input-group">
+              <span className="input-group-text bg-white border-end-0">
+                <Search size={18} className="text-muted" />
+              </span>
+              <input type="text" className="form-control border-start-0" placeholder="Search by user, action, or details..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+          </div>
+          <div className="col-md-1">
+            <button className="btn btn-outline-secondary w-100" title="Advanced Filters">
+              <Filter size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Table Info */}
+        <div className="mb-3 d-flex justify-content-between">
+          <small className="text-muted">
+            {loading ? 'Loading...' : `Showing ${Math.min(indexOfFirstRecord + 1, totalRecords)} to ${Math.min(indexOfLastRecord, totalRecords)} of ${totalRecords} records`}
+          </small>
+          <small className="text-muted">Page {currentPage} of {totalPages || 1}</small>
+        </div>
+
+        {/* Table */}
+        <div className="table-responsive">
+          <table className="table audit-table">
+            <thead>
+              <tr>{['Timestamp', 'User', 'Role', 'Action', 'Details', 'Status'].map(h => <th key={h}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentRecords.length > 0 ? (
+                currentRecords.map(log => (
+                  <tr key={log.id}>
+                    <td className="text-muted">{log.timestamp}</td>
+                    <td className="fw-semibold">{log.user}</td>
+                    <td><span className={`role-badge ${log.role === 'Admin' ? 'role-admin' : 'role-subscriber'}`}>{log.role}</span></td>
+                    <td><span className="action-badge">{log.action}</span></td>
+                    <td>{log.details}</td>
+                    <td>
+                      <span className={`status-badge status-${log.status}`}>{log.status}</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="text-center py-4 text-muted">
+                    No audit logs found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <button className="btn btn-pagination" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+            <ChevronLeft size={18} className="me-1" />
+            Previous
+          </button>
+          <div className="pagination-info">
+            <span className="page-number">{currentPage}</span>
+            <span className="text-muted mx-2">of</span>
+            <span className="page-number">{totalPages || 1}</span>
+          </div>
+          <button className="btn btn-pagination" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages || totalPages === 0}>
+            Next
+            <ChevronRight size={18} className="ms-1" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AuditLogs;
+Authcontroller
+
+package com.rwtool.controller;
+
+import com.rwtool.dto.AuthResponse;
+import com.rwtool.dto.LoginRequest;
+import com.rwtool.dto.SignupRequest;
+import com.rwtool.service.AuthService;
+import com.rwtool.service.AuditLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "Authentication", description = "Authentication management APIs")
+public class AuthController {
+    
+    @Autowired
+    private AuthService authService;
+    
+    @Autowired
+    private AuditLogService auditLogService;
+    
+    @Operation(summary = "Register a new user", description = "Create a new user account")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "User created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input or email already exists")
+    })
+    @PostMapping("/signup")
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
+        try {
+            AuthResponse response = authService.signup(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "User signed up successfully", 
+                "success"
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "Failed signup attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
+        }
+    }
+    
+    @Operation(summary = "Login user", description = "Authenticate user and return JWT token")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Login successful"),
+        @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    })
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            AuthResponse response = authService.login(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                response.getRole(), 
+                "USER_LOGIN", 
+                "User logged in successfully", 
+                "success"
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Unknown", 
+                "LOGIN_FAILED", 
+                "Failed login attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
+        }
+    }
+    
+    @Operation(summary = "Health check", description = "Check if the authentication service is running")
+    @ApiResponse(responseCode = "200", description = "Service is healthy")
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Auth service is running");
+    }
+}
+
+subscriptionrequestcontroller
+package com.rwtool.controller;
+
+import com.rwtool.dto.ApprovalDecisionDTO;
+import com.rwtool.dto.SubscriptionRequestDTO;
+import com.rwtool.model.SubscriptionRequest;
+import com.rwtool.service.SubscriptionRequestService;
+import com.rwtool.service.AuditLogService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/subscriptions")
+@CrossOrigin(origins = "http://localhost:3000")
+public class SubscriptionRequestController {
+
+    @Autowired
+    private SubscriptionRequestService subscriptionRequestService;
+    
+    @Autowired
+    private AuditLogService auditLogService;
+
+    // Get all subscription requests (for admin)
+    @GetMapping
+    public ResponseEntity<List<SubscriptionRequest>> getAllRequests() {
+        try {
+            List<SubscriptionRequest> requests = subscriptionRequestService.getAllRequests();
+            return ResponseEntity.ok(requests);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Get pending requests (for admin)
+    @GetMapping("/pending")
+    public ResponseEntity<List<SubscriptionRequest>> getPendingRequests() {
+        try {
+            List<SubscriptionRequest> requests = subscriptionRequestService.getPendingRequests();
+            return ResponseEntity.ok(requests);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Get requests by user email (for user dashboard)
+    @GetMapping("/user/{email}")
+    public ResponseEntity<List<SubscriptionRequest>> getRequestsByUser(@PathVariable String email) {
+        try {
+            List<SubscriptionRequest> requests = subscriptionRequestService.getRequestsByUser(email);
+            return ResponseEntity.ok(requests);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Get request by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<SubscriptionRequest> getRequestById(@PathVariable String id) {
+        try {
+            SubscriptionRequest request = subscriptionRequestService.getRequestById(id);
+            return ResponseEntity.ok(request);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    // Create new subscription request (for users)
+    @PostMapping
+    public ResponseEntity<?> createRequest(@RequestBody SubscriptionRequestDTO requestDTO) {
+        try {
+            SubscriptionRequest request = subscriptionRequestService.createRequest(requestDTO);
+            return ResponseEntity.status(HttpStatus.CREATED).body(request);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // Approve or reject request (for admin)
+    @PutMapping("/{id}/review")
+    public ResponseEntity<?> reviewRequest(
+            @PathVariable String id,
+            @RequestBody ApprovalDecisionDTO decision) {
+        try {
+            SubscriptionRequest request = subscriptionRequestService.processRequest(id, decision);
+            return ResponseEntity.ok(request);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // Approve request (for admin)
+    @PutMapping("/{id}/approve")
+    public ResponseEntity<?> approveRequest(@PathVariable String id) {
+        try {
+            SubscriptionRequest request = subscriptionRequestService.approveRequest(id);
+            // TODO: Get actual admin email from security context
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_APPROVED",
+                "Approved subscription request for " + request.getEmail(),
+                "success"
+            );
+            return ResponseEntity.ok(request);
+        } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_APPROVAL_FAILED",
+                "Failed to approve subscription request: " + e.getMessage(),
+                "failed"
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // Reject request (for admin)
+    @PutMapping("/{id}/reject")
+    public ResponseEntity<?> rejectRequest(
+            @PathVariable String id,
+            @RequestBody ApprovalDecisionDTO decision) {
+        try {
+            String reason = decision.getRejectionReason();
+            SubscriptionRequest request = subscriptionRequestService.rejectRequest(id, reason);
+            // TODO: Get actual admin email from security context
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_REJECTED",
+                "Rejected subscription request for " + request.getEmail() + ". Reason: " + reason,
+                "success"
+            );
+            return ResponseEntity.ok(request);
+        } catch (RuntimeException e) {
+            auditLogService.logActivity(
+                "system",
+                "Admin",
+                "USER_REJECTION_FAILED",
+                "Failed to reject subscription request: " + e.getMessage(),
+                "failed"
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // Cancel request (for users)
+    @DeleteMapping("/{id}/cancel")
+    public ResponseEntity<?> cancelRequest(
+            @PathVariable String id,
+            @RequestParam String userEmail) {
+        try {
+            subscriptionRequestService.cancelRequest(id, userEmail);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // Get dashboard statistics (for admin)
+    @GetMapping("/stats")
+    public ResponseEntity<?> getDashboardStats() {
+        try {
+            List<SubscriptionRequest> allRequests = subscriptionRequestService.getAllRequests();
+            
+            long totalRequests = allRequests.size();
+            long pendingCount = allRequests.stream()
+                    .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
+                    .count();
+            long approvedCount = allRequests.stream()
+                    .filter(r -> "APPROVED".equalsIgnoreCase(r.getStatus()))
+                    .count();
+            long rejectedCount = allRequests.stream()
+                    .filter(r -> "REJECTED".equalsIgnoreCase(r.getStatus()))
+                    .count();
+            
+            double approvalRate = totalRequests > 0 
+                    ? (approvedCount * 100.0) / (approvedCount + rejectedCount)
+                    : 0.0;
+            
+            java.util.Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("totalRequests", totalRequests);
+            stats.put("pendingRequests", pendingCount);
+            stats.put("approvedRequests", approvedCount);
+            stats.put("rejectedRequests", rejectedCount);
+            stats.put("approvalRate", Math.round(approvalRate * 10) / 10.0); // Round to 1 decimal
+            
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+}
+
+
+
+
+A
