@@ -1,164 +1,113 @@
-package com.rwtool.service;
+package com.rwtool.controller;
 
-import com.rwtool.dto.AuditLogDTO;
-import com.rwtool.dto.PageResponse;
-import com.rwtool.model.AuditLog;
-import com.rwtool.repository.AuditLogRepository;
+import com.rwtool.dto.AuthResponse;
+import com.rwtool.dto.LoginRequest;
+import com.rwtool.dto.SignupRequest;
+import com.rwtool.service.AuthService;
+import com.rwtool.service.AuditLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
-@Service
-public class AuditLogService {
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "Authentication", description = "Authentication management APIs")
+public class AuthController {
     
     @Autowired
-    private AuditLogRepository auditLogRepository;
+    private AuthService authService;
     
-    // Initialize with minimal test data if empty
-    @jakarta.annotation.PostConstruct
-    public void initializeIfEmpty() {
+    @Autowired
+    private AuditLogService auditLogService;
+    
+    @Operation(summary = "Register a new user", description = "Create a new user account")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "User created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input or email already exists")
+    })
+    @PostMapping("/signup")
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
         try {
-            if (auditLogRepository.count() == 0) {
-                // Create a few test entries
-                logActivity("admin@test.com", "Admin", "USER_LOGIN", "Test admin login", "success");
-                logActivity("user@test.com", "Subscriber", "USER_LOGIN", "Test user login", "success");
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to initialize audit logs: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    // Create audit log entry
-    public void logActivity(String userEmail, String role, String action, String details, String status) {
-        AuditLog auditLog = new AuditLog(userEmail, role, action, details, status);
-        auditLogRepository.save(auditLog);
-    }
-    
-    
-    // Get recent activity (last 10 entries)
-    public List<AuditLogDTO> getRecentActivity() {
-        List<AuditLog> recentLogs = auditLogRepository.findTop10ByOrderByTimestampDesc();
-        return recentLogs.stream()
-                .map(AuditLogDTO::new)
-                .collect(Collectors.toList());
-    }
-    
-    // Get paginated audit logs with filters
-    public PageResponse<AuditLogDTO> getAuditLogs(String userEmail, String action, String role, 
-                                                  String status, String dateRange, String searchTerm,
-                                                  int page, int size) {
-        
-        try {
-        
-        // Calculate date range
-        LocalDateTime startDate = null;
-        LocalDateTime endDate = LocalDateTime.now();
-        
-        if (dateRange != null) {
-            switch (dateRange) {
-                case "today":
-                    startDate = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
-                    break;
-                case "7days":
-                    startDate = LocalDateTime.now().minusDays(7);
-                    break;
-                case "30days":
-                    startDate = LocalDateTime.now().minusDays(30);
-                    break;
-                case "90days":
-                    startDate = LocalDateTime.now().minusDays(90);
-                    break;
-            }
-        }
-        
-        // Convert filter values
-        String filterUserEmail = (userEmail != null && !userEmail.equals("All Users")) ? userEmail : null;
-        String filterAction = (action != null && !action.equals("All Actions")) ? action : null;
-        String filterRole = (role != null && !role.equals("All Users")) ? role : null;
-        String filterStatus = (status != null && !status.equals("All Status")) ? status : null;
-        String filterSearchTerm = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : null;
-        
-        // Create pageable with sorting by timestamp descending
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
-        
-        // Get filtered results - use simple query for now to avoid complex filtering issues
-        Page<AuditLog> auditLogPage;
-        try {
-            // Try the complex query first
-            auditLogPage = auditLogRepository.findWithFilters(
-                    filterUserEmail, filterAction, filterRole, filterStatus, 
-                    startDate, endDate, filterSearchTerm, pageable);
-        } catch (Exception e) {
-            System.err.println("Complex query failed, using simple findAll: " + e.getMessage());
-            // Fallback to simple query if complex one fails
-            auditLogPage = auditLogRepository.findAll(pageable);
-        }
-        
-        // Convert to DTOs
-        List<AuditLogDTO> auditLogDTOs = auditLogPage.getContent().stream()
-                .map(AuditLogDTO::new)
-                .collect(Collectors.toList());
-        
-        return new PageResponse<>(
-                auditLogDTOs,
-                auditLogPage.getTotalElements(),
-                auditLogPage.getNumber(),
-                auditLogPage.getSize(),
-                auditLogPage.getTotalPages(),
-                auditLogPage.isFirst(),
-                auditLogPage.isLast()
-        );
-        
-        } catch (Exception e) {
-            System.err.println("Error in getAuditLogs: " + e.getMessage());
-            e.printStackTrace();
-            // Return empty page response on error
-            return new PageResponse<>(
-                new ArrayList<>(),
-                0L,
-                page,
-                size,
-                0,
-                true,
-                true
+            AuthResponse response = authService.signup(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "User signed up successfully", 
+                "success"
             );
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Subscriber", 
+                "USER_SIGNUP", 
+                "Failed signup attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
         }
     }
     
-    // Get all unique actions for filter dropdown
-    public List<String> getAllActions() {
+    @Operation(summary = "Login user", description = "Authenticate user and return JWT token")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Login successful"),
+        @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    })
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         try {
-            return auditLogRepository.findAll().stream()
-                    .map(AuditLog::getAction)
-                    .distinct()
-                    .sorted()
-                    .collect(Collectors.toList());
+            AuthResponse response = authService.login(request);
+            auditLogService.logActivity(
+                request.getEmail(), 
+                response.getRole(), 
+                "USER_LOGIN", 
+                "User logged in successfully", 
+                "success"
+            );
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            // Return empty list if no data or error
-            return new ArrayList<>();
+            auditLogService.logActivity(
+                request.getEmail(), 
+                "Unknown", 
+                "LOGIN_FAILED", 
+                "Failed login attempt: " + e.getMessage(), 
+                "failed"
+            );
+            throw e;
         }
     }
     
-    // Get all unique roles for filter dropdown
-    public List<String> getAllRoles() {
+    @Operation(summary = "Get total user count", description = "Get total")
+    @ApiResponse(responseCode = "200", description = "Users count retrieved")
+    @GetMapping("/users/count")
+    public ResponseEntity<Map<String, Long>> getUsersCount() {
         try {
-            return auditLogRepository.findAll().stream()
-                    .map(AuditLog::getRole)
-                    .distinct()
-                    .sorted()
-                    .collect(Collectors.toList());
+            Long count = authService.getTotalUserCount();
+            Map<String, Long> response = new HashMap<>();
+            response.put("count", count);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            // Return empty list if no data or error
-            return new ArrayList<>();
+            Map<String, Long> errorResponse = new HashMap<>();
+            errorResponse.put("count", 0L);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
+    }
+    
+    @Operation(summary = "Health check", description = "Check if the authentication service is running")
+    @ApiResponse(responseCode = "200", description = "Service is healthy")
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Auth service is running");
     }
 }
