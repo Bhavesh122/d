@@ -43,13 +43,8 @@ const LoginPage = ({ role, navigate }) => {
     setMessage('');
 
     try {
-      // Clear any stale identity tokens before new login
-      try {
-        sessionStorage.removeItem('token');
-      } catch (_) { /* ignore */ }
-      try {
-        localStorage.removeItem('token');
-      } catch (_) { /* ignore */ }
+      // Clear only this tab's session token before new login; do not touch localStorage to avoid cross-tab impact
+      try { sessionStorage.removeItem('token'); } catch (_) { /* ignore */ }
 
       const response = await axios.post('http://localhost:8080/api/auth/login', {
         email: formData.email,
@@ -63,26 +58,12 @@ const LoginPage = ({ role, navigate }) => {
         // Save token per-tab to support multiple concurrent logins in different tabs
         try {
           sessionStorage.setItem('token', token);
-        } catch (_) {
-          // Fallback to localStorage if sessionStorage is unavailable
-          localStorage.setItem('token', token);
-        }
+        } catch (_) { /* ignore */ }
 
         // Decode token payload to extract role (optional)
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userRole = payload.role;
-        // Persist identity for downstream pages
-        try {
-          const emailFromToken = payload?.email || payload?.sub;
-          if (emailFromToken) {
-            localStorage.setItem('userEmail', emailFromToken);
-          } else if (formData?.email) {
-            localStorage.setItem('userEmail', formData.email);
-          }
-          if (payload?.name) {
-            localStorage.setItem('userName', payload.name);
-          }
-        } catch (_) { /* ignore */ }
+        // Do not persist email/name in localStorage to avoid cross-tab identity bleed.
 
         setMessage('Login successful! Reloading...');
         // Force a full reload to reset SPA state under the new identity
