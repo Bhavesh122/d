@@ -24,6 +24,14 @@ export default function Dashboard({ navigate }) {
     const [activeReports, setActiveReports] = useState(0);
     const [pendingRequests, setPendingRequests] = useState(0);
     const [totalDomains, setTotalDomains] = useState(0);
+    
+    // Authentication check after ALL hooks
+    const token = localStorage.getItem('token');
+    const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+    if (!token || authUser.role !== 'ADMIN') {
+        navigate('/login');
+        return null;
+    }
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -88,13 +96,6 @@ export default function Dashboard({ navigate }) {
         
         return () => clearInterval(interval);
     }, [fetchDashboardData]);
-
-    // Authentication check after ALL hooks
-    const token = localStorage.getItem('token');
-    if (!token) {
-        navigate('/login');
-        return null;
-    }
 
     const logout = () => {
         navigate('landing'); // Redirect to landing page
@@ -231,3 +232,28 @@ export default function Dashboard({ navigate }) {
         </div>
     );
 }
+
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+
+const ProtectedRoute = ({ children, requiredRole }) => {
+    // Check authentication token
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return <Navigate to="/login" replace />;
+    }
+    
+    // Check user role if required
+    if (requiredRole) {
+        const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+        if (authUser.role !== requiredRole) {
+            return <Navigate to="/" replace />;
+        }
+    }
+    
+    return children;
+};
+
+export default ProtectedRoute;
+
+
