@@ -1,114 +1,233 @@
-// App.js
-import React, { useState, useEffect } from "react";
-import {
-  Routes,
-  Route,
-  useNavigate as useRouterNavigate,
-  useLocation,
-} from "react-router-dom";
-import ProtectedRoute from "./components/ProtectedRoute";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import ApproveRejectSubscription from "../ApproveReject/ApproveRejectSubscription";
+import { DomainManagement } from "../DomainManagement/DomainManagement";
+import { FilePathManagement } from "../FilePathManagement/FilePathManagement";
+import { UserGroupAccess } from "../UserGroupAccess/UserGroupAccess";
+import './Dashboard.css';
+import AuditLogs from "../AuditLog/AuditLogs";
+import AdminNotification from "../AdminNotification/AdminNotification";
+import { LogOut } from 'lucide-react';
+import subscriptionService from '../../../services/subscriptionService';
+import domainService from '../../../services/domainService';
+import userService from '../../../services/userService';
+import fileRoutingService from '../../../services/fileRoutingService';
 
-import StartLandingPage from "./Pages/StartLandingPage/StartLandingPage";
-import LandingPage from "./Pages/HomePage/LandingPage";
-import LoginPage from "./Pages/HomePage/LoginPage";
-import SignupPage from "./Pages/HomePage/SignupPage";
-import OpsDashboard from "./Pages/OpsPage/OpsDashboard";
-import Dashboard from "./Pages/AdminPage/AdminDashBoard/Dashboard";
-import SubscriberDashboard from "./Pages/SubscriberPage/SubscriberDashboard/SubscriberDashboard";
+export default function Dashboard({ navigate }) {
+    // All hooks must be declared at the top
+    const [view, setView] = useState('dashboard');
+    const [open, setOpen] = useState(true);
+    const [recentRequests, setRecentRequests] = useState([]);
+    const [recentDomains, setRecentDomains] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [activeReports, setActiveReports] = useState(0);
+    const [pendingRequests, setPendingRequests] = useState(0);
+    const [totalDomains, setTotalDomains] = useState(0);
 
-import "./Pages/HomePage/Style.css";
+    const fetchDashboardData = useCallback(async () => {
+        try {
+            setLoading(true);
+            
+            // Fetch all stats in parallel for better performance
+            const [
+                allRequests,
+                allDomains,
+                totalUsersCount,
+                pendingRequestsData
+            ] = await Promise.all([
+                subscriptionService.getAllRequests(),
+                domainService.getAllDomains(),
+                userService.getTotalUsersCount(),
+                subscriptionService.getPendingRequests()
+            ]);
 
-/**
- * App component:
- * - DOES NOT create a BrowserRouter (assumes one exists at the app root, e.g. index.js)
- * - Preserves your navigate(page, role) API for existing pages
- */
+            // Get active reports count from localStorage (synchronous)
+            const activeReportsCount = fileRoutingService.getActiveReportsCount();
 
-const pageToPath = {
-  "start-landing": "/",
-  landing: "/home",
-  login: "/login",
-  signup: "/signup",
-  "admin-dashboard": "/admin-dashboard",
-  "ops-dashboard": "/ops-dashboard",
-  "subscriber-dashboard": "/subscriber-dashboard",
-};
+            // Update stats
+            setTotalUsers(totalUsersCount);
+            setActiveReports(activeReportsCount);
+            setPendingRequests(pendingRequestsData.length);
+            setTotalDomains(allDomains.length);
 
-const pathToPage = Object.fromEntries(
-  Object.entries(pageToPath).map(([k, v]) => [v, k])
-);
+            // Fetch latest 3 subscription requests for display
+            const latest3Requests = allRequests
+                .sort((a, b) => new Date(b.requestedDate) - new Date(a.requestedDate))
+                .slice(0, 3)
+                .map(req => ({
+                    id: req.id,
+                    name: req.userName,
+                    domain: req.domainName,
+                    status: req.status
+                }));
+            setRecentRequests(latest3Requests);
 
-const AppInner = ({ currentPage, setCurrentPage, userRole, setUserRole }) => {
-  const routerNavigate = useRouterNavigate();
-  const location = useLocation();
+            // Fetch latest 3 domains for display
+            const latest3Domains = allDomains
+                .sort((a, b) => new Date(b.createdDate || 0) - new Date(a.createdDate || 0))
+                .slice(0, 3)
+                .map(dom => ({
+                    name: dom.name,
+                    desc: dom.description,
+                    created: dom.createdDate ? new Date(dom.createdDate).toLocaleDateString() : 'N/A'
+                }));
+            setRecentDomains(latest3Domains);
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-  // sync URL -> app state on mount / when location changes
-  useEffect(() => {
-    const pageFromPath = pathToPage[location.pathname] || "landing";
-    setCurrentPage(pageFromPath);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+    useEffect(() => {
+        fetchDashboardData();
+        
+        // Refresh dashboard data every 30 seconds to keep stats current
+        const interval = setInterval(fetchDashboardData, 30000);
+        
+        return () => clearInterval(interval);
+    }, [fetchDashboardData]);
 
-  // navigate function passed to pages (keeps old contract)
-  const navigate = (page, role = null) => {
-    if (role !== null) setUserRole(role);
-    setCurrentPage(page);
-
-    const targetPath = pageToPath[page] || "/home";
-    if (location.pathname !== targetPath) {
-      routerNavigate(targetPath);
+    // Authentication check after ALL hooks
+    const token = localStorage.getItem('token');
+    if (!token) {
+        navigate('/login');
+        return null;
     }
-  };
 
-  return (
-    <Routes>
-      <Route path="/" element={<StartLandingPage navigate={navigate} />} />
-      <Route path="/home" element={<LandingPage navigate={navigate} />} />
-      <Route path="/login" element={<LoginPage role={userRole} navigate={navigate} />} />
-      <Route path="/signup" element={<SignupPage role={userRole} navigate={navigate} />} />
-      <Route 
-        path="/admin-dashboard" 
-        element={
-          <ProtectedRoute requiredRole="ADMIN">
-            <Dashboard navigate={navigate} />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/ops-dashboard" 
-        element={
-          <ProtectedRoute requiredRole="OPS">
-            <OpsDashboard navigate={navigate} />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/subscriber-dashboard" 
-        element={
-          <ProtectedRoute requiredRole="SUBSCRIBER">
-            <SubscriberDashboard navigate={navigate} />
-          </ProtectedRoute>
-        } 
-      />
-      <Route path="*" element={<LandingPage navigate={navigate} />} />
-    </Routes>
-  );
-};
+    const logout = () => {
+        navigate('landing'); // Redirect to landing page
+    };
 
-const App = () => {
-  const [currentPage, setCurrentPage] = useState("start-landing");
-  const [userRole, setUserRole] = useState(null);
+    // Dynamic stats using real backend data
+    const stats = [
+        { label: "Total Users", val: totalUsers.toString(), change: "Registered users" },
+        { label: "Active Reports", val: activeReports.toString(), change: "Successfully sent files" },
+        { label: "Pending Requests", val: pendingRequests.toString(), change: "Requires attention" },
+        { label: "Total Domains", val: totalDomains.toString(), change: "Available domains" }
+    ];
 
-  return (
-    <div className="app">
-      <AppInner
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        userRole={userRole}
-        setUserRole={setUserRole}
-      />
-    </div>
-  );
-};
 
-export default App;
+    // Manual refresh function for immediate updates
+    const refreshDashboard = () => {
+        fetchDashboardData();
+    };
+
+    const nav = [
+        { name: "Dashboard", icon: "", view: "dashboard" },
+        { name: "Approve/Reject Subscription", icon: "", view: "approve" },
+        { name: "Domain Management", icon: "", view: "domains" },
+        { name: "File Path Management", icon: "", view: "filepaths" },
+        { name: "User Group Access", icon: "", view: "usergroups" },
+        { name: "Logs", icon: "", view: "logs" }
+    ];
+
+
+    const renderContent = () => {
+        if (view == 'approve') return <ApproveRejectSubscription onUpdate={refreshDashboard} />;
+        if (view == 'domains') return <DomainManagement onUpdate={refreshDashboard} />;
+        if (view == 'filepaths') return <FilePathManagement onUpdate={refreshDashboard} />;
+        if (view == 'usergroups') return <UserGroupAccess />;
+        if (view == 'logs') return <AuditLogs />;
+
+
+        return <>
+            <h1>Dashboard</h1>
+            <p className="subtitle">Welcome back! Here's an overview of your system</p>
+            <div className="stats">
+                {stats.map((s, i) => (
+                    <div key={i} className="card">
+                        <div><p className="label">{s.label}</p><h2>{s.val}</h2><p className="change">{s.change} </p> </div>
+
+                    </div>
+                ))}
+            </div>
+            <div className="grid">
+                <div className="card">
+                    <div className="header">
+                        <div><h3> Approve/Reject Subscription</h3><p>Latest user access requests</p></div>
+                        <button onClick={() => setView('approve')}>View all</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>User</th><th>Domain</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentRequests.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No recent requests</td></tr>
+                            ) : (
+                                recentRequests.map(r => (
+                                    <tr key={r.id}>
+                                        <td className="bold">{r.name}</td>
+                                        <td>{r.domain}</td>
+                                        <td><span className={`badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="card">
+                    <div className="header">
+                        <div><h3> Domain Management </h3><p> Available report domains</p>
+                        </div>
+                        <button onClick={() => setView('domains')}> View all</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>Domain Name</th><th> Description </th><th>Created</th></tr></thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>Loading...</td></tr>
+                            ) : recentDomains.length === 0 ? (
+                                <tr><td colSpan="3" style={{textAlign: 'center'}}>No domains available</td></tr>
+                            ) : (
+                                recentDomains.map((d, i) => (
+                                    <tr key={i}>
+                                        <td className="bold">{d.name}</td>
+                                        <td>{d.desc}</td>
+                                        <td>{d.created}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
+    };
+
+    return (
+        <div className="dash">
+            <div className={`side ${open ? 'open' : ''}`}>
+                <div className="side-head">
+                    <span className="logo-icon"></span>
+                    <div><h2>RW Tool</h2><p>Admin Panel</p></div>
+                </div>
+
+                <div className="side-nav">
+                    <p className="nav-label">Management</p>
+                    {nav.map((n, i) => (
+                        <button key={i} onClick={() => setView(n.view)} className={`nav-btn ${view == n.view ? 'active' : ''}`}>
+                            <span>{n.icon}</span>{n.name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="main">
+                <div className="top">
+                    <button onClick={() => setOpen(!open)} className="menu">☰</button>
+                    <div className="actions">
+                        <AdminNotification />
+                        <button onClick={logout} className="logout-btn">
+                            <LogOut style={{ width: 16, height: 16 }} />
+                            Logout
+                        </button>
+                    </div>
+                </div>
+                <div className="content">{renderContent()}</div>
+
+            </div>
+        </div>
+    );
+}
