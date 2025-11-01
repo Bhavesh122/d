@@ -1,7 +1,10 @@
+import axios from 'axios';
+
 // Simple user session management utility
 // This works with your existing backend and token system
 
 const USER_SESSION_KEY = 'currentUserSession';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 // Store user session after successful login
 export const setUserSession = (userInfo) => {
@@ -27,16 +30,22 @@ export const getUserSession = () => {
 export const clearUserSession = () => {
     try {
         localStorage.removeItem(USER_SESSION_KEY);
+        // Also clear the auth token
+        localStorage.removeItem('token');
     } catch (error) {
         console.error('Error clearing user session:', error);
     }
 };
 
 // Update user session (for profile updates)
-export const updateUserSession = (updatedInfo) => {
+export const updateUserSession = async (updatedInfo) => {
     try {
         const currentSession = getUserSession();
         if (currentSession) {
+            // Update user profile in backend
+            await updateUserProfile(currentSession.email, updatedInfo);
+            
+            // Update local session
             const updatedSession = { ...currentSession, ...updatedInfo };
             setUserSession(updatedSession);
             return updatedSession;
@@ -44,45 +53,65 @@ export const updateUserSession = (updatedInfo) => {
         return null;
     } catch (error) {
         console.error('Error updating user session:', error);
-        return null;
+        throw error;
     }
 };
 
-// Default user data based on role (for demo purposes)
-export const getDefaultUserData = (email, role) => {
-    const userDefaults = {
-        'user@rwtool.com': {
-            name: 'Tony Stark',
-            email: 'user@rwtool.com',
-            phone: '+1 (555) 123-4567',
-            domain: 'Finance',
-            department: 'Engineering',
-            role: 'user'
-        },
-        'admin@rwtool.com': {
-            name: 'Steve Rogers',
-            email: 'admin@rwtool.com',
-            phone: '+1 (555) 987-6543',
-            domain: 'Technology',
-            department: 'Administration',
-            role: 'admin'
-        },
-        'ops@rwtool.com': {
-            name: 'Natasha Romanoff',
-            email: 'ops@rwtool.com',
-            phone: '+1 (555) 456-7890',
-            domain: 'Operations',
-            department: 'Operations',
-            role: 'ops'
-        }
-    };
+// Fetch user data from backend
+export const fetchUserData = async (email) => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/users/profile/${email}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        throw error;
+    }
+};
 
-    return userDefaults[email] || {
-        name: 'User',
-        email: email,
-        phone: '',
-        domain: '',
-        department: '',
-        role: role
-    };
+// Update user profile in backend
+export const updateUserProfile = async (email, profileData) => {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await axios.put(`${API_BASE_URL}/users/profile/${email}`, profileData, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        throw error;
+    }
+};
+
+// Login user and fetch their profile data
+export const loginUser = async (email, password, role) => {
+    try {
+        // First authenticate with backend
+        const authResponse = await axios.post(`${API_BASE_URL}/auth/login`, {
+            email,
+            password,
+            role
+        });
+
+        const { token, user } = authResponse.data;
+        
+        // Store token
+        localStorage.setItem('token', token);
+        
+        // Store user session
+        setUserSession(user);
+        
+        return user;
+    } catch (error) {
+        console.error('Error logging in user:', error);
+        throw error;
+    }
 };
