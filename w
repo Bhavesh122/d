@@ -1,159 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Phone, Briefcase, Edit2, Save, X } from 'lucide-react';
-import { getUserSession, updateUserSession, fetchUserData } from '../../../utils/userSession';
-import './SubscriberProfile.css';
+import React, { useState } from 'react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { loginUser } from '../../utils/userSession';
 
-const SubscriberProfile = () => {
-    const [editing, setEditing] = useState(false);
-    const [data, setData] = useState({
-        name: '', email: '', phone: '', domain: '', department: ''
-    });
-    const [temp, setTemp] = useState({ ...data });
-    const [loading, setLoading] = useState(true);
+const LoginPage = ({ role, navigate }) => {
+    const [formData, setFormData] = useState({ email: '', password: '' });
+    const [showPassword, setShowPassword] = useState(false);
+    const [errors, setErrors] = useState({});
 
-    // Load user data from session and refresh from backend when component mounts
-    useEffect(() => {
-        loadUserData();
-    }, []);
+    const roleConfig = {
+        user: { color: '#38D200', title: 'User Login' },
+        admin: { color: '#0473EA', title: 'Admin Login' },
+        ops: { color: '#38D200', title: 'Ops Login' },
+    };
 
-    const loadUserData = async () => {
-        try {
-            const currentUser = getUserSession();
-            if (currentUser) {
-                // Try to fetch fresh data from backend
-                try {
-                    const freshUserData = await fetchUserData(currentUser.email);
-                    const userData = {
-                        name: freshUserData.name || '',
-                        email: freshUserData.email || '',
-                        phone: freshUserData.phone || '',
-                        domain: freshUserData.domain || '',
-                        department: freshUserData.department || ''
-                    };
-                    setData(userData);
-                    setTemp(userData);
-                } catch (error) {
-                    // If backend fails, use session data as fallback
-                    console.warn('Could not fetch fresh user data, using session data:', error);
-                    const userData = {
-                        name: currentUser.name || '',
-                        email: currentUser.email || '',
-                        phone: currentUser.phone || '',
-                        domain: currentUser.domain || '',
-                        department: currentUser.department || ''
-                    };
-                    setData(userData);
-                    setTemp(userData);
+    const config = roleConfig[role] || { color: '#333', title: 'Login' };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    };
+
+    const validateForm = () => {
+        const newErrors = {};
+        if (!formData.email) newErrors.email = 'Email is required';
+        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+
+        if (!formData.password) newErrors.password = 'Password is required';
+        else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+
+        return newErrors;
+    };
+
+    const handleSubmit = async () => {
+        const newErrors = validateForm();
+        if (Object.keys(newErrors).length === 0) {
+            try {
+                // Login with backend
+                const user = await loginUser(formData.email, formData.password, role);
+                
+                // Navigate based on user role
+                if (user.role === 'ops') {
+                    navigate('ops-dashboard');
+                } else if (user.role === 'admin') {
+                    navigate('admin-dashboard');
+                } else if (user.role === 'user') {
+                    navigate('subscriber-dashboard');
+                } else {
+                    alert(`${config.title} successful!`);
                 }
+            } catch (error) {
+                alert(`Login failed: ${error.response?.data?.message || error.message}`);
             }
-        } catch (error) {
-            console.error('Error loading user data:', error);
-        } finally {
-            setLoading(false);
+        } else {
+            setErrors(newErrors);
         }
     };
 
-    const fields = [
-        { icon: Mail, label: 'Email', key: 'email', type: 'email' },
-        { icon: Phone, label: 'Phone', key: 'phone', type: 'tel' },
-        { icon: Briefcase, label: 'Domain', key: 'domain', type: 'text' }
-    ];
-
-    const handleSave = async () => {
-        try {
-            // Update the session and backend with new data
-            await updateUserSession(temp);
-            setData({ ...temp });
-            setEditing(false);
-            alert('Profile updated successfully!');
-        } catch (error) {
-            console.error('Error updating profile:', error);
-            alert('Failed to update profile. Please try again.');
-        }
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter') handleSubmit();
     };
-
-    const stats = [
-        { label: 'Reports Downloaded', value: '142', color: '#0473BA' },
-        { label: 'Favorite Reports', value: '3', color: '#38D200' }
-    ];
-
-    if (loading) {
-        return (
-            <div className="profile-container">
-                <h1 className="profile-title">My Profile</h1>
-                <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
-            </div>
-        );
-    }
-
-    const currentUser = getUserSession();
-    if (!currentUser) {
-        return (
-            <div className="profile-container">
-                <h1 className="profile-title">My Profile</h1>
-                <div style={{ textAlign: 'center', padding: '2rem' }}>Please log in to view your profile.</div>
-            </div>
-        );
-    }
 
     return (
-        <div className="profile-container">
-            <h1 className="profile-title">My Profile</h1>
-            <br></br>
-            <div className="profile-card">
-                <div className="profile-header">
-                    <div className="header-info">
-                        {editing ? (
-                            <input className="name-input" value={temp.name} 
-                                onChange={(e) => setTemp({ ...temp, name: e.target.value })} />
-                        ) : <h2>{data.name}</h2>}
-                        <p>Subscriber</p>
-                    </div>
-                    {!editing ? (
-                        <button className="btn-edit" onClick={() => { setEditing(true); setTemp({ ...data }); }}>
-                            <Edit2 size={16} /> Edit
-                        </button>
-                    ) : (
-                        <div className="edit-btns">
-                            <button className="btn-save" onClick={handleSave}>
-                                <Save size={16} /> Save
-                            </button>
-                            <button className="btn-cancel" onClick={() => { setTemp({ ...data }); setEditing(false); }}>
-                                <X size={16} /> Cancel
-                            </button>
-                        </div>
-                    )}
+        <div className="auth-container">
+            <div className="auth-box">
+                <button className="back-button" onClick={() => navigate('landing')}>
+                    ← Back
+                </button>
+
+                <div className="auth-header">
+                    <h1 className="auth-title">{config.title}</h1>
+                    <p className="auth-subtitle">Enter your credentials to continue</p>
                 </div>
 
-                <div className="stats">
-                    {stats.map((s, i) => (
-                        <div key={i} className="stat" style={{ borderLeftColor: s.color }}>
-                            <div className="stat-val" style={{ color: s.color }}>{s.value}</div>
-                            <div className="stat-label">{s.label}</div>
+                <div className="auth-form">
+                    <div className="form-group">
+                        <label htmlFor="email" className="form-label">Email Address</label>
+                        <div className="input-wrapper">
+                            <Mail size={20} className="input-icon" />
+                            <input
+                                className={`form-input ${errors.email ? 'error' : ''}`}
+                                type="email"
+                                id="email"
+                                name="email"
+                                placeholder="user@example.com"
+                                value={formData.email}
+                                onChange={handleChange}
+                                onKeyPress={handleKeyPress}
+                            />
                         </div>
-                    ))}
+                        {errors.email && <span className="error-text">{errors.email}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="password" className="form-label">Password</label>
+                        <div className="input-wrapper">
+                            <Lock size={20} className="input-icon" />
+                            <input
+                                id="password"
+                                name="password"
+                                className={`form-input ${errors.password ? 'error' : ''}`}
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="........"
+                                value={formData.password}
+                                onChange={handleChange}
+                                onKeyPress={handleKeyPress}
+                            />
+                            <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
+                        {errors.password && <span className="error-text">{errors.password}</span>}
+                    </div>
+
+                    <button
+                        className="submit-button"
+                        style={{ backgroundColor: config.color }}
+                        onClick={handleSubmit}
+                    >
+                        Login <ArrowRight size={20} />
+                    </button>
                 </div>
 
-                <div className="info-section">
-                    <h3>Personal Information</h3>
-                    <div className="info-grid">
-                        {fields.map((f, i) => (
-                            <div key={i} className="info-item">
-                                <div className="icon"><f.icon size={20} /></div>
-                                <div>
-                                    <label>{f.label}</label>
-                                    {editing ? (
-                                        <input type={f.type} value={temp[f.key]} 
-                                            onChange={(e) => setTemp({ ...temp, [f.key]: e.target.value })} />
-                                    ) : <p>{data[f.key]}</p>}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                <div className="auth-footer">
+                    Don't have an account?{' '}
+                    <button className="link-button" style={{ color: config.color }} onClick={() => navigate('signup', role)}>
+                        Sign up
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
-export default SubscriberProfile;
+export default LoginPage;
