@@ -177,7 +177,6 @@ const LoginPage = ({ role, navigate }) => {
 
 export default LoginPage;
 
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -185,11 +184,19 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     const token = localStorage.getItem('token');
     const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
     
+    console.log('ProtectedRoute check:', { 
+        hasToken: !!token, 
+        userRole: authUser.role, 
+        requiredRole 
+    });
+    
     if (!token) {
+        console.log('Redirecting to login - no token');
         return <Navigate to="/login" replace />;
     }
     
     if (requiredRole && authUser.role !== requiredRole) {
+        console.log(`Redirecting to home - role mismatch (${authUser.role} vs ${requiredRole})`);
         return <Navigate to="/" replace />;
     }
     
