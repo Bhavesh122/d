@@ -25,19 +25,10 @@ export default function Dashboard({ navigate }) {
     const [pendingRequests, setPendingRequests] = useState(0);
     const [totalDomains, setTotalDomains] = useState(0);
     
-    // Authentication check after ALL hooks
-    const token = localStorage.getItem('token');
-    const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
-    if (!token || authUser.role !== 'ADMIN') {
-        navigate('/login');
-        return null;
-    }
-
     const fetchDashboardData = useCallback(async () => {
         try {
             setLoading(true);
             
-            // Fetch all stats in parallel for better performance
             const [
                 allRequests,
                 allDomains,
@@ -49,17 +40,13 @@ export default function Dashboard({ navigate }) {
                 userService.getTotalUsersCount(),
                 subscriptionService.getPendingRequests()
             ]);
-
-            // Get active reports count from localStorage (synchronous)
-            const activeReportsCount = fileRoutingService.getActiveReportsCount();
-
-            // Update stats
+            
+            // Update state here
             setTotalUsers(totalUsersCount);
-            setActiveReports(activeReportsCount);
+            setActiveReports(fileRoutingService.getActiveReportsCount());
             setPendingRequests(pendingRequestsData.length);
             setTotalDomains(allDomains.length);
 
-            // Fetch latest 3 subscription requests for display
             const latest3Requests = allRequests
                 .sort((a, b) => new Date(b.requestedDate) - new Date(a.requestedDate))
                 .slice(0, 3)
@@ -71,7 +58,6 @@ export default function Dashboard({ navigate }) {
                 }));
             setRecentRequests(latest3Requests);
 
-            // Fetch latest 3 domains for display
             const latest3Domains = allDomains
                 .sort((a, b) => new Date(b.createdDate || 0) - new Date(a.createdDate || 0))
                 .slice(0, 3)
@@ -91,11 +77,18 @@ export default function Dashboard({ navigate }) {
     useEffect(() => {
         fetchDashboardData();
         
-        // Refresh dashboard data every 30 seconds to keep stats current
         const interval = setInterval(fetchDashboardData, 30000);
         
         return () => clearInterval(interval);
     }, [fetchDashboardData]);
+
+    // Authentication check after ALL hooks
+    const token = localStorage.getItem('token');
+    const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+    if (!token || authUser.role !== 'ADMIN') {
+        navigate('/login');
+        return null;
+    }
 
     const logout = () => {
         navigate('landing'); // Redirect to landing page
@@ -232,28 +225,3 @@ export default function Dashboard({ navigate }) {
         </div>
     );
 }
-
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-
-const ProtectedRoute = ({ children, requiredRole }) => {
-    // Check authentication token
-    const token = localStorage.getItem('token');
-    if (!token) {
-        return <Navigate to="/login" replace />;
-    }
-    
-    // Check user role if required
-    if (requiredRole) {
-        const authUser = JSON.parse(localStorage.getItem('authUser') || '{}');
-        if (authUser.role !== requiredRole) {
-            return <Navigate to="/" replace />;
-        }
-    }
-    
-    return children;
-};
-
-export default ProtectedRoute;
-
-
