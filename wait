@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./ApproveRejectSubscription.css";
 import subscriptionService from "../../../services/subscriptionService";
 
@@ -48,16 +48,21 @@ const ApproveRejectSubscription = () => {
             }
         };
         window.addEventListener('storage', onStorage);
-        // Auto-refresh every 5s to reflect new requests created from other tabs
+        // Auto-refresh every 5s (quiet, no spinner). We'll only update state if data actually changed
         const intervalId = setInterval(() => {
-            fetchPendingRequests();
+            fetchPendingRequests(false);
         }, 5000);
-        return () => window.removeEventListener('storage', onStorage);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            clearInterval(intervalId);
+        };
     }, []);
 
-    const fetchPendingRequests = async () => {
+    const prevSignatureRef = useRef("");
+
+    const fetchPendingRequests = async (showSpinner = true) => {
         try {
-            setLoadingAD(true);
+            if (showSpinner) setLoadingAD(true);
             const data = await subscriptionService.getAllRequests();
             
             // Transform backend data to match component structure
@@ -82,13 +87,22 @@ const ApproveRejectSubscription = () => {
                 };
             });
 
-            setSubscriptions(subscriptionsWithAD);
+            // Compute a compact signature to detect real changes and avoid unnecessary re-renders
+            const signature = JSON.stringify(
+                subscriptionsWithAD
+                    .map(s => ({ id: s.id, status: s.status, reviewedDate: s.reviewedDate, rejectionReason: s.rejectionReason }))
+                    .sort((a, b) => a.id.localeCompare(b.id))
+            );
+            if (signature !== prevSignatureRef.current) {
+                prevSignatureRef.current = signature;
+                setSubscriptions(subscriptionsWithAD);
+            }
         } catch (error) {
             console.error('Error fetching subscription requests:', error);
             setNotification('Error loading subscription requests');
             setTimeout(() => setNotification(''), 3000);
         } finally {
-            setLoadingAD(false);
+            if (showSpinner) setLoadingAD(false);
         }
     };
 
