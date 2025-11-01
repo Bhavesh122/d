@@ -34,11 +34,23 @@ const SubscriptionRequestComponent = () => {
         }
         return { email: '', name: 'Subscriber', domain: '', role: 'Subscriber' };
     };
-    const currentUser = resolveAuth();
+    const [currentUser, setCurrentUser] = useState(resolveAuth());
 
     // Fetch available domains and user subscriptions from backend
     useEffect(() => {
         fetchData();
+    }, [currentUser.email]);
+
+    // Reload or update auth when token changes (role/account switch)
+    useEffect(() => {
+        const onStorage = (e) => {
+            if (e.key === 'token') {
+                // Simplest: full reload to reset app state tied to identity
+                window.location.reload();
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
     }, []);
 
     const fetchData = async () => {
@@ -390,440 +402,215 @@ const SubscriptionRequestComponent = () => {
 export default SubscriptionRequestComponent;
 
 
-package com.rwtool.config;
 
-import com.rwtool.service.CustomUserDetailsService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import axios from 'axios';
 
-import java.util.Arrays;
+const API_BASE_URL = 'http://localhost:8080/api';
 
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-    
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
-    
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
-    
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+// Create an axios instance and attach JWT from localStorage if present
+const api = axios.create({ baseURL: API_BASE_URL });
+api.interceptors.request.use((config) => {
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
+        || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+        || null;
+    if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
     }
-    
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
-    }
-    
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
+    return config;
+});
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable()) // Disable CSRF for development
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
-            .headers(headers -> headers.frameOptions(frame -> frame.disable())) // Allow embedding in iframes (for PDF preview)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // Allow authentication endpoints
-                .requestMatchers("/api/subscriptions/**").authenticated() // Require auth for subscription flows
-                .requestMatchers("/api/**").permitAll() // Allow other API endpoints for now
-                .requestMatchers("/reports/**").permitAll() // Allow report preview endpoints
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll() // Allow Swagger
-                .anyRequest().permitAll() // Allow everything else for development
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
-        return http.build();
-    }
-    
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins for development
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
-        
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
-}
-
-
-
-import React, { useEffect, useState } from "react";
-import "./ApproveRejectSubscription.css";
-import subscriptionService from "../../../services/subscriptionService";
-
-const ApproveRejectSubscription = () => {
-    const [subscriptions, setSubscriptions] = useState([]);
-    const [search, setSearch] = useState("");
-    const [filter, setFilter] = useState("All");
-    const [showRejectModal, setShowRejectModal] = useState(false);
-    const [rejectingSubscription, setRejectingSubscription] = useState(null);
-    const [rejectionReason, setRejectionReason] = useState("");
-    const [otherReasonText, setOtherReasonText] = useState("");
-    const [loadingAD, setLoadingAD] = useState(true);
-    const [notification, setNotification] = useState("");
-
-    // Resolve auth from JWT only
-    const resolveAuth = () => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                return {
-                    email: payload.email || payload.sub || '',
-                    role: payload.role || ''
-                };
-            } catch (_) { /* ignore */ }
-        }
-        return { email: '', role: '' };
-    };
-    const currentUser = resolveAuth();
-    const isAdmin = (currentUser.role || '').toUpperCase() === 'ADMIN';
-
-    useEffect(() => {
-        // If not admin, block access and do not fetch
-        if (!isAdmin) {
-            setNotification('Access denied: Admins only');
-            setLoadingAD(false);
-            return;
-        }
-        fetchPendingRequests();
-
-        // Reload tab when token changes (role switch)
-        const onStorage = (e) => {
-            if (e.key === 'token') {
-                window.location.reload();
-            }
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, []);
-
-    const fetchPendingRequests = async () => {
+const subscriptionService = {
+    // Get all subscription requests (admin)
+    getAllRequests: async () => {
         try {
-            setLoadingAD(true);
-            const data = await subscriptionService.getAllRequests();
-            
-            // Transform backend data to match component structure
-            const subscriptionsWithAD = data.map((sub) => {
-                // Use domain from user profile (userDepartment field contains the domain from profile)
-                const profileDomain = sub.userDepartment || 'Unknown';
-                return {
-                    id: sub.id,
-                    name: sub.userName,
-                    email: sub.userEmail,
-                    domain: sub.domainName,
-                    date: new Date(sub.requestedDate).toLocaleDateString(),
-                    reviewedDate: sub.reviewedDate ? new Date(sub.reviewedDate).toLocaleDateString() : null,
-                    status: sub.status,
-                    requestReason: sub.requestReason,
-                    rejectionReason: sub.rejectionReason,
-                    userDepartment: sub.userDepartment,
-                    userRole: sub.userRole,
-                    actualDepartment: profileDomain, // Show domain from user profile
-                    departmentMatch: profileDomain.toLowerCase() === sub.domainName.toLowerCase(),
-                    profileDomain: profileDomain
-                };
-            });
-
-            setSubscriptions(subscriptionsWithAD);
+            const response = await api.get(`/subscriptions`);
+            return response.data;
         } catch (error) {
             console.error('Error fetching subscription requests:', error);
-            setNotification('Error loading subscription requests');
-            setTimeout(() => setNotification(''), 3000);
-        } finally {
-            setLoadingAD(false);
+            throw error;
         }
-    };
+    },
 
-    const handleApprove = async (id) => {
+    // Get pending requests (admin)
+    getPendingRequests: async () => {
         try {
-            await subscriptionService.approveRequest(id);
-            setNotification('Subscription request approved successfully!');
-            setTimeout(() => setNotification(''), 3000);
-            // Refresh the list
-            await fetchPendingRequests();
+            const response = await api.get(`/subscriptions/pending`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching pending requests:', error);
+            throw error;
+        }
+    },
+
+    // Get requests by user email (user)
+    getRequestsByUser: async (email) => {
+        try {
+            const response = await api.get(`/subscriptions/user/${encodeURIComponent(email)}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user requests:', error);
+            throw error;
+        }
+    },
+
+    // Create new subscription request (user)
+    createRequest: async (requestData) => {
+        try {
+            const response = await api.post(`/subscriptions`, requestData);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating subscription request:', error);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
+        }
+    },
+
+    // Approve request (admin)
+    approveRequest: async (requestId) => {
+        try {
+            const response = await api.put(`/subscriptions/${requestId}/approve`);
+            return response.data;
         } catch (error) {
             console.error('Error approving request:', error);
-            setNotification('Error approving request');
-            setTimeout(() => setNotification(''), 3000);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
         }
-    };
+    },
 
-    const openRejectModal = (subscription) => {
-        setRejectingSubscription(subscription);
-        if (!subscription.departmentMatch) {
-            setRejectionReason("Requested domain does not match user's department");
-        } else {
-            setRejectionReason("");
-        }
-        setShowRejectModal(true);
-    };
-
-    const closeRejectModal = () => {
-        setShowRejectModal(false);
-        setRejectingSubscription(null);
-        setRejectionReason("");
-        setOtherReasonText("");
-    };
-
-    const handleReject = async () => {
-        const finalReason = rejectionReason === "Other" ? otherReasonText : rejectionReason;
-        
-        if (!finalReason.trim()) {
-            alert("Please provide a reason for rejection");
-            return;
-        }
-
+    // Reject request (admin)
+    rejectRequest: async (requestId, rejectionReason) => {
         try {
-            await subscriptionService.rejectRequest(rejectingSubscription.id, finalReason);
-            setNotification('Subscription request rejected');
-            setTimeout(() => setNotification(''), 3000);
-            closeRejectModal();
-            // Refresh the list
-            await fetchPendingRequests();
+            const response = await api.put(
+                `/subscriptions/${requestId}/reject`,
+                { rejectionReason }
+            );
+            return response.data;
         } catch (error) {
             console.error('Error rejecting request:', error);
-            setNotification('Error rejecting request');
-            setTimeout(() => setNotification(''), 3000);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
         }
-    };
+    },
 
-    const filteredData = subscriptions.filter((sub) => {
-        const matchSearch =
-            sub.name.toLowerCase().includes(search.toLowerCase()) ||
-            sub.email.toLowerCase().includes(search.toLowerCase()) ||
-            sub.domain.toLowerCase().includes(search.toLowerCase());
+    // Review request with decision (admin)
+    reviewRequest: async (requestId, action, rejectionReason = null) => {
+        try {
+            const response = await api.put(
+                `/subscriptions/${requestId}/review`,
+                { action, rejectionReason }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error reviewing request:', error);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
+        }
+    },
 
-        const matchFilter = filter === "All" ? true : sub.status.toUpperCase() === filter.toUpperCase();
-        return matchSearch && matchFilter;
-    });
-
-    const pendingCount = subscriptions.filter((s) => s.status === "PENDING").length;
-
-    return (
-        <div className="ar-container">
-            {/* Notification */}
-            {notification && (
-                <div className="ar-notification">{notification}</div>
-            )}
-            <div className="ar-top-header">
-                <div className="ar-header-left">
-                    <h2 className="ar-title">Subscription Requests</h2>
-                    <p className="ar-subtitle">Manage and review employee subscription requests</p>
-                </div>
-                <div className="ar-header-right">
-                    <span className="ar-pending-count">
-                        
-                        {pendingCount} Pending
-                    </span>
-                </div>
-            </div>
-
-            <div className="ar-search-filter-section">
-                <input
-                    type="text"
-                    className="ar-search-input"
-                    placeholder="Search by name, email, or domain..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-
-                <div className="ar-filter-buttons">
-                    {["All", "Pending", "Approved", "Rejected"].map((tab) => (
-                        <button
-                            key={tab}
-                            className={`ar-filter-tab ${filter === tab ? "ar-active" : ""}`}
-                            onClick={() => setFilter(tab)}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="ar-cards-container">
-                {loadingAD && (
-                    <div className="ar-loading">Loading AD information...</div>
-                )}
-                {!loadingAD && filteredData.map((sub) => (
-                    <div key={sub.id} className={`ar-subscription-card ${!sub.departmentMatch && sub.status.toUpperCase() === 'PENDING' ? 'ar-mismatch' : ''}`}>
-                        <div className="ar-sub-info">
-                            <h5 className="ar-name">{sub.name}</h5>
-                            <p className="ar-email">{sub.email}</p>
-                            <p className="ar-date">Request Date: {sub.date}</p>
-                            {sub.reviewedDate && (
-                                <p className="ar-date" style={{color: '#6c757d'}}>
-                                    Reviewed Date: {sub.reviewedDate}
-                                </p>
-                            )}
-                            
-                            <div className="ar-domain-comparison">
-                                <div className="ar-domain-row">
-                                    <span className="ar-domain-label">Requested Domain:</span>
-                                    <span className="ar-domain-value">{sub.domain}</span>
-                                </div>
-                                <div className="ar-domain-row">
-                                    <span className="ar-domain-label">Signup Domain:</span>
-                                    <span className={`ar-domain-value ${sub.departmentMatch ? 'ar-match' : 'ar-no-match'}`}>
-                                        {sub.actualDepartment}
-                                        {sub.departmentMatch ? ' ✓' : ' ✗'}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            {sub.requestReason && (
-                                <div className="ar-request-reason">
-                                    <strong>Request Reason:</strong>
-                                    <p>{sub.requestReason}</p>
-                                </div>
-                            )}
-                            
-                            {!sub.departmentMatch && sub.status.toUpperCase() === 'PENDING' && (
-                                <div className="ar-warning">
-                                    ⚠️ Department mismatch detected
-                                </div>
-                            )}
-                            
-                            {sub.status.toUpperCase() === 'REJECTED' && sub.rejectionReason && (
-                                <div className="ar-rejection-reason">
-                                    <strong>Rejection Reason:</strong> {sub.rejectionReason}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="ar-sub-actions">
-                            <span
-                                className={`ar-status-badge ${
-                                    sub.status.toUpperCase() === "PENDING"
-                                        ? "ar-status-pending"
-                                        : sub.status.toUpperCase() === "APPROVED"
-                                        ? "ar-status-approved"
-                                        : "ar-status-rejected"
-                                }`}
-                            >
-                                {sub.status}
-                            </span>
-
-                            {sub.status.toUpperCase() === "PENDING" && (
-                                <div className="ar-btn-group">
-                                    <button
-                                        className="ar-action-btn ar-approve"
-                                        onClick={() => handleApprove(sub.id)}
-                                    >
-                                        Approve
-                                    </button>
-                                    <button
-                                        className="ar-action-btn ar-reject"
-                                        onClick={() => openRejectModal(sub)}
-                                    >
-                                        Reject
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
-                {!loadingAD && filteredData.length === 0 && (
-                    <p className="ar-no-data">No records found.</p>
-                )}
-            </div>
-
-            {showRejectModal && rejectingSubscription && (
-                <div className="ar-modal-backdrop" onClick={closeRejectModal}>
-                    <div className="ar-modal" onClick={(e) => e.stopPropagation()}>
-                        <h2 className="ar-modal-title">Reject Subscription Request</h2>
-                        <div className="ar-modal-user-info">
-                            <p><strong>User:</strong> {rejectingSubscription.name}</p>
-                            <p><strong>Email:</strong> {rejectingSubscription.email}</p>
-                            <p><strong>Requested Domain:</strong> {rejectingSubscription.domain}</p>
-                            <p><strong>Actual Department:</strong> {rejectingSubscription.actualDepartment}</p>
-                        </div>
-                        
-                        {rejectingSubscription.requestReason && (
-                            <div className="ar-modal-request-reason">
-                                <strong>📝 Subscriber's Request Reason:</strong>
-                                <p>{rejectingSubscription.requestReason}</p>
-                            </div>
-                        )}
-                        
-                        <div className="ar-modal-form">
-                            <label className="ar-modal-label">Reason for Rejection *</label>
-                            <select
-                                className="ar-modal-select"
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
-                            >
-                                <option value="">-- Select Reason --</option>
-                                <option value="Requested domain does not match user's department">
-                                    Requested domain does not match user's department
-                                </option>
-                                <option value="User not found in Active Directory">
-                                    User not found in Active Directory
-                                </option>
-                                <option value="Insufficient permissions for requested domain">
-                                    Insufficient permissions for requested domain
-                                </option>
-                                <option value="Domain access restricted">
-                                    Domain access restricted
-                                </option>
-                                <option value="Other">Other</option>
-                            </select>
-                            
-                            {rejectionReason === "Other" && (
-                                <textarea
-                                    className="ar-modal-textarea"
-                                    placeholder="Please specify the reason..."
-                                    rows="3"
-                                    value={otherReasonText}
-                                    onChange={(e) => setOtherReasonText(e.target.value)}
-                                />
-                            )}
-                        </div>
-                        
-                        <div className="ar-modal-actions">
-                            <button className="ar-modal-btn ar-cancel" onClick={closeRejectModal}>
-                                Cancel
-                            </button>
-                            <button className="ar-modal-btn ar-confirm-reject" onClick={handleReject}>
-                                Confirm Rejection
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+    // Cancel request (user)
+    cancelRequest: async (requestId, userEmail) => {
+        try {
+            await api.delete(`/subscriptions/${requestId}/cancel?userEmail=${encodeURIComponent(userEmail)}`);
+        } catch (error) {
+            console.error('Error cancelling request:', error);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
+        }
+    }
 };
 
-export default ApproveRejectSubscription;
+export default subscriptionService;
 
+
+
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8080/api';
+
+// Create an axios instance and attach JWT from localStorage if present
+const api = axios.create({ baseURL: API_BASE_URL });
+api.interceptors.request.use((config) => {
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
+        || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+        || null;
+    if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+});
+
+const domainService = {
+    // Get all domains
+    getAllDomains: async () => {
+        try {
+            const response = await api.get(`/domains`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching domains:', error);
+            throw error;
+        }
+    },
+
+    // Get domain by ID
+    getDomainById: async (id) => {
+        try {
+            const response = await api.get(`/domains/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching domain:', error);
+            throw error;
+        }
+    },
+
+    // Add new domain
+    addDomain: async (domain) => {
+        try {
+            const response = await api.post(`/domains`, domain);
+            return response.data;
+        } catch (error) {
+            console.error('Error adding domain:', error);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
+        }
+    },
+
+    // Update domain
+    updateDomain: async (id, domain) => {
+        try {
+            const response = await api.put(`/domains/${id}`, domain);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating domain:', error);
+            if (error.response && error.response.data) {
+                throw new Error(error.response.data);
+            }
+            throw error;
+        }
+    },
+
+    // Delete domain
+    deleteDomain: async (id) => {
+        try {
+            await api.delete(`/domains/${id}`);
+        } catch (error) {
+            console.error('Error deleting domain:', error);
+            throw error;
+        }
+    }
+};
+
+export default domainService;
