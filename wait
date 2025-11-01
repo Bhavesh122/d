@@ -1,188 +1,187 @@
-import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import SubscriptionRequestComponent from '../SubscriptionRequestComponent/SubscriptionRequestComponent';
+import DownloadReportComponent from '../DownloadReport/DownloadReportComponent';
+import SubscriptionDashboard from '../SubscriptionStatusPage/SubsciptionDashboard';
+import SubscriberNotification from '../SubscriberNotification/SubscriberNotification';
+import SubscriberProfile from '../Profile/SubscriberProfile';
+import { LogOut } from 'lucide-react';
+import '../../AdminPage/AdminDashBoard/Dashboard.css';
+import './SubscriberDashboard.css';
+import subscriptionService from '../../../services/subscriptionService';
+import folderService from '../../../services/folderService';
 
-const LoginPage = ({ role, navigate }) => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+const SubscriberDashboard = ({ navigate: navigateToPage }) => {
+    const [view, setView] = useState('dashboard');
+    const [open, setOpen] = useState(true);
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [rawFiles, setRawFiles] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-  const roleConfig = {
-    user: { color: '#38D200', title: 'User Login' },
-    admin: { color: '#0473EA', title: 'Admin Login' },
-    ops: { color: '#38D200', title: 'Ops Login' },
-  };
+    const logout = () => {
+        navigateToPage('landing');
+    };
+    // Resolve authenticated user identity strictly from JWT to avoid stale localStorage fields
+    const resolveAuth = () => {
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+            || null;
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return {
+                    email: payload.email || payload.sub || '',
+                    name: payload.name || 'Subscriber'
+                };
+            } catch (_) {
+                return { email: '', name: 'Subscriber' };
+            }
+        }
+        return { email: '', name: 'Subscriber' };
+    };
+    const user = resolveAuth();
+    
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoading(true);
+                // fetch subscriptions for user
+                const subs = user.email ? await subscriptionService.getRequestsByUser(user.email) : [];
+                setSubscriptions(Array.isArray(subs) ? subs : (subs.subscriptions || []));
+                // fetch accessible files for user
+                const files = user.email ? await folderService.getUserAccessibleFiles(user.email) : [];
+                setRawFiles(Array.isArray(files) ? files : []);
+                // normalize to match DownloadReportComponent display: remove prefix before underscore and extension
+                const normalized = (files || []).map((f, idx) => {
+                    const original = f.name || '';
+                    const underscoreIdx = original.indexOf('_');
+                    const afterPrefix = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                    const lastDot = afterPrefix.lastIndexOf('.');
+                    const display = lastDot > 0 ? afterPrefix.substring(0, lastDot) : afterPrefix;
+                    return {
+                        id: idx + 1,
+                        title: display,
+                        domain: f.folder
+                    };
+                });
+                setReports(normalized);
+            } catch (e) {
+                setSubscriptions([]);
+                setReports([]);
+                setRawFiles([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        const t = setInterval(load, 15000);
+        return () => clearInterval(t);
+    }, []);
 
-  const config = roleConfig[role] || { color: '#333', title: 'Login' };
+    const approvedDomains = subscriptions
+        .filter(s => (s.status || '').toUpperCase() === 'APPROVED')
+        .map(s => s.domain || s.domainName || s.folder || s.category)
+        .filter(Boolean);
+    const filteredReports = reports.filter(r => approvedDomains.includes(r.domain));
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
-  };
+    const nav = [
+        { name: 'Dashboard', view: 'dashboard' },
+        { name: 'My Subscriptions', view: 'subscriptions' },
+        { name: 'Request Subscription', view: 'request' },
+        { name: 'Download Reports', view: 'downloads' },
+        { name: 'Profile', view: 'profile' }
+    ];
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    return newErrors;
-  };
+    const renderContent = () => {
+        if (view === 'subscriptions') return <SubscriptionDashboard subscriptions={subscriptions} />;
+        if (view === 'request') return <SubscriptionRequestComponent subscriptions={subscriptions} />;
+        if (view === 'downloads') return <DownloadReportComponent reports={reports} subscriptions={subscriptions} />;
+        if (view === 'profile') return <SubscriberProfile userEmail={user.email} initialName={user.name} />;
 
-  const handleSubmit = async () => {
-    const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
+        return (
+            <>
+                <h1>Dashboard</h1>
+                <p className="subtitle">Welcome back. Here is your dashboard overview.</p>
+                <div className="stats">
+                    <div className="card"><div><p className="label">Active Subscriptions</p><h2>{approvedDomains.length}</h2></div></div>
+                    <div className="card"><div><p className="label">Pending Requests</p><h2>{subscriptions.filter(s => s.status === 'PENDING').length}</h2></div></div>
+                    <div className="card"><div><p className="label">Available Reports</p><h2>{reports.length}</h2></div></div>
+                    <div className="card"><div><p className="label">Rejected Requests</p><h2>{subscriptions.filter(s => s.status === 'REJECTED').length}</h2></div></div>
+                </div>
+                <div className="grid">
+                    <div className="card">
+                        <div className="header">
+                            <div><h3> My Subscriptions</h3><p>Approved and pending domains</p></div>
+                            <button onClick={() => setView('subscriptions')}>View all</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>Domain</th><th>Status</th></tr></thead>
+                            <tbody>
+                                {(subscriptions || []).slice(0, 5).map(s => {
+                                    const dom = s.domain || s.domainName || s.folder || s.category || '—';
+                                    const status = (s.status || '').toString();
+                                    return (
+                                        <tr key={s.id}><td className="bold">{dom}</td><td><span className={`badge ${status.toLowerCase()}`}>{status}</span></td></tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="card">
+                        <div className="header">
+                            <div><h3> Download Reports</h3><p>Reports for approved domains</p></div>
+                            <button onClick={() => setView('downloads')}>View all</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>Title</th><th>Domain</th></tr></thead>
+                            <tbody>
+                                {(reports || []).slice(0, 5).map(r => (
+                                    <tr key={r.id}><td className="bold">{r.title}</td><td>{r.domain}</td></tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </>
+        );
+    };
 
-    setLoading(true);
-    setMessage('');
-
-    try {
-      // Clear only this tab's session token before new login; do not touch localStorage to avoid cross-tab impact
-      try { sessionStorage.removeItem('token'); } catch (_) { /* ignore */ }
-
-      const response = await axios.post('http://localhost:8080/api/auth/login', {
-        email: formData.email,
-        password: formData.password
-      }, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      const { token } = response.data;
-      if (token) {
-        // Save token per-tab to support multiple concurrent logins in different tabs
-        try {
-          sessionStorage.setItem('token', token);
-        } catch (_) { /* ignore */ }
-
-        // Decode token payload to extract role (optional)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const userRole = payload.role;
-        // Do not persist email/name in localStorage to avoid cross-tab identity bleed.
-
-        setMessage('Login successful! Redirecting...');
-        // Navigate to the correct dashboard for this role
-        try {
-          if (userRole === 'ADMIN') navigate('admin-dashboard');
-          else if (userRole === 'OPS') navigate('ops-dashboard');
-          else navigate('subscriber-dashboard');
-        } catch (_) { /* ignore */ }
-        // Then force a full reload shortly after to reset SPA state under the new identity
-        setTimeout(() => {
-          window.location.reload();
-        }, 400);
-      }
-    } catch (err) {
-      if (err.response?.status === 401 || err.response?.data?.error === 'INVALID_CREDENTIALS') {
-        setMessage('Invalid email or password.');
-      } else {
-        setMessage('Login failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleSubmit();
-  };
-
-  return (
-    <div className="auth-container">
-      <div className="auth-box">
-        <button className="back-button" onClick={() => navigate('landing')}>
-          ← Back
-        </button>
-
-        <div className="auth-header">
-          <h1 className="auth-title">{config.title}</h1>
-          <p className="auth-subtitle">Enter your credentials to continue</p>
-        </div>
-
-        <div className="auth-form">
-          <div className="form-group">
-            <label htmlFor="email" className="form-label">Email Address</label>
-            <div className="input-wrapper">
-              <Mail size={20} className="input-icon" />
-              <input
-                className={`form-input ${errors.email ? 'error' : ''}`}
-                type="email"
-                id="email"
-                name="email"
-                placeholder="user@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                onKeyPress={handleKeyPress}
-              />
+    return (
+        <div className="dash">
+            <div className={`side ${open ? 'open' : ''}`}>
+                <div className="side-head">
+                    <span className="logo-icon"></span>
+                    <div><h2>RW Tool</h2><p>Subscriber Panel</p></div>
+                </div>
+                <div className="side-nav">
+                    <p className="nav-label">Navigation</p>
+                    {nav.map((n, i) => (
+                        <button key={i} onClick={() => setView(n.view)} className={`nav-btn ${view === n.view ? 'active' : ''}`}>
+                            <span>{n.icon}</span>{n.name}
+                        </button>
+                    ))}
+                </div>
             </div>
-            {errors.email && <span className="error-text">{errors.email}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">Password</label>
-            <div className="input-wrapper">
-              <Lock size={20} className="input-icon" />
-              <input
-                id="password"
-                name="password"
-                className={`form-input ${errors.password ? 'error' : ''}`}
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                onKeyPress={handleKeyPress}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+            <div className="main">
+                <div className="top">
+                    <button onClick={() => setOpen(!open)} className="menu">☰</button>
+                    <div className="actions">
+                        <SubscriberNotification
+                            userEmail={user.email}
+                            subscriptions={subscriptions}
+                            files={rawFiles}
+                            approvedDomains={approvedDomains}
+                        />
+                        <button onClick={logout} className="logout-btn">
+                            <LogOut style={{ width: 16, height: 16 }} />
+                            Logout
+                        </button>
+                    </div>
+                </div>
+                <div className="content">{renderContent()}</div>
             </div>
-            {errors.password && <span className="error-text">{errors.password}</span>}
-          </div>
-
-          <button
-            className="submit-button"
-            style={{ backgroundColor: config.color }}
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : <>Login <ArrowRight size={20} /></>}
-          </button>
         </div>
-
-        {message && (
-          <p
-            style={{
-              textAlign: 'center',
-              marginTop: '15px',
-              color: message.includes('success') ? 'green' : 'red'
-            }}
-          >
-            {message}
-          </p>
-        )}
-
-        <div className="auth-footer">
-          Don't have an account?{' '}
-          <button
-            className="link-button"
-            style={{ color: config.color }}
-            onClick={() => navigate('signup', role)}
-          >
-            Sign up
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
-export default LoginPage;
+export default SubscriberDashboard;
