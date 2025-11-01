@@ -1,53 +1,702 @@
-import axios from 'axios';
+// SubscriptionDashboard.js
+import React, { useState, useEffect } from "react";
+import StatusBadge from "./StatusBadge"; // default export
+import subscriptionService from "../../../services/subscriptionService";
 
-const API_BASE_URL = 'http://localhost:8080/api';
+export default function SubscriptionDashboard({ subscriptions: propsSubscriptions }) {
+    const [searchQuery, setSearchQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState("All");
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-// Create an axios instance and attach JWT from sessionStorage/localStorage
-const api = axios.create({ baseURL: API_BASE_URL });
-api.interceptors.request.use((config) => {
-    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
-        || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
-        || null;
-    if (token) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${token}`;
+    // Resolve authenticated user identity from JWT
+    const resolveAuth = () => {
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+            || null;
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return { email: payload.email || payload.sub || '' };
+            } catch (_) {
+                return { email: '' };
+            }
+        }
+        return { email: '' };
+    };
+    const currentUser = resolveAuth();
+
+    useEffect(() => {
+        // If subscriptions are passed from parent (SubscriberDashboard), use them
+        if (propsSubscriptions && propsSubscriptions.length > 0) {
+            setSubscriptions(propsSubscriptions);
+            setLoading(false);
+        } else if (currentUser.email) {
+            fetchUserSubscriptions();
+        } else {
+            setLoading(false);
+        }
+    }, [propsSubscriptions, currentUser.email]);
+
+    const fetchUserSubscriptions = async () => {
+        try {
+            setLoading(true);
+            const data = await subscriptionService.getRequestsByUser(currentUser.email);
+            setSubscriptions(data);
+        } catch (error) {
+            console.error('Error fetching subscriptions:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filtered = subscriptions.filter((sub) => {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+            q === "" ||
+            sub.domainName.toLowerCase().includes(q) ||
+            (sub.rejectionReason && sub.rejectionReason.toLowerCase().includes(q));
+        const matchesStatus =
+            statusFilter === "All" ||
+            sub.status.toLowerCase() === statusFilter.toLowerCase();
+        return matchesSearch && matchesStatus;
+    });
+
+    const primaryGradient = "linear-gradient(135deg, #0473EA 0%, #0A5BB8 50%, #064A8E 100%)";
+    const subtitleBlue = "#4A89C7";
+
+    return (
+        <div
+            style={{
+                fontFamily: "'Inter', system-ui, sans-serif",
+                background:
+                    "linear-gradient(180deg, rgba(4,115,234,0.06) 0%, rgba(10,91,184,0.03) 50%, rgba(6,74,142,0.02) 100%)",
+                padding: 32,
+                minHeight: "100vh",
+            }}
+        >
+            <main style={{ maxWidth: 1200, margin: "0 auto" }}>
+                <div
+                    style={{
+                        borderRadius: 20,
+                        overflow: "hidden",
+                        background: "#fff",
+                        boxShadow: "0 8px 30px rgba(6,74,142,0.08)",
+                    }}
+                >
+                    <div style={{ height: 8, background: primaryGradient }} />
+
+                    <div style={{ padding: "22px 28px" }}>
+                        <h1
+                            style={{
+                                margin: 0,
+                                fontSize: "1.9rem",
+                                color: "#064A8E",
+                                fontWeight: 700,
+                            }}
+                        >
+                            Subscription Status
+                        </h1>
+                        <p
+                            style={{
+                                margin: "8px 0 18px",
+                                color: subtitleBlue,
+                                fontSize: "0.95rem",
+                            }}
+                        >
+                            Manage your report subscriptions and review their approval status
+                        </p>
+
+                        {/* Search + Filters */}
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 16,
+                                alignItems: "center",
+                                marginBottom: 20,
+                            }}
+                        >
+                            <div style={{ flex: "1 1 300px", position: "relative" }}>
+                                <i
+                                    className="bi bi-search"
+                                    style={{
+                                        position: "absolute",
+                                        left: 14,
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        color: "#9fbde8",
+                                    }}
+                                />
+                                <input
+                                    type="search"
+                                    placeholder="Search reports..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    style={{
+                                        width: "100%",
+                                        height: 48,
+                                        borderRadius: 28,
+                                        paddingLeft: 44,
+                                        border: "1px solid #e7f0ff",
+                                        backgroundColor: "#fbfdff",
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {["All", "Pending", "Approved", "Rejected"].map((status) => (
+                                    <button
+                                        key={status}
+                                        onClick={() => setStatusFilter(status)}
+                                        style={{
+                                            minWidth: 90,
+                                            borderRadius: 20,
+                                            fontWeight: 500,
+                                            border: "none",
+                                            padding: "8px 16px",
+                                            cursor: "pointer",
+                                            background:
+                                                statusFilter === status
+                                                    ? status === "Approved"
+                                                        ? "#10b981"
+                                                        : status === "Pending"
+                                                            ? "#f59e0b"
+                                                            : status === "Rejected"
+                                                                ? "#ef4444"
+                                                                : "#0473EA"
+                                                    : "#f1f5f9",
+                                            color:
+                                                statusFilter === status
+                                                    ? "white"
+                                                    : "rgba(6,74,142,0.8)",
+                                        }}
+                                    >
+                                        {status}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        {loading ? (
+                            <div style={{ textAlign: "center", padding: "48px 0" }}>
+                                <p style={{ color: "#7a8fae" }}>Loading subscriptions...</p>
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "48px 0" }}>
+                                <div
+                                    style={{
+                                        width: 88,
+                                        height: 88,
+                                        margin: "0 auto 12px",
+                                        borderRadius: "50%",
+                                        background: "#f3fbff",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <i
+                                        className="bi bi-inbox"
+                                        style={{ fontSize: "2rem", color: "#9fbde8" }}
+                                    />
+                                </div>
+                                <p style={{ color: "#7a8fae" }}>No subscriptions yet.</p>
+                            </div>
+                        ) : (
+                            <table
+                                style={{
+                                    width: "100%",
+                                    borderCollapse: "collapse",
+                                    fontSize: 14,
+                                }}
+                            >
+                                <thead>
+                                    <tr style={{ borderBottom: "2px solid #eef6ff" }}>
+                                        <th
+                                            style={{
+                                                textAlign: "left",
+                                                padding: "1rem 0",
+                                                fontSize: 12,
+                                                color: "#7d8fa8",
+                                                textTransform: "uppercase",
+                                            }}
+                                        >
+                                            Report Domain
+                                        </th>
+                                        <th
+                                            style={{
+                                                textAlign: "right",
+                                                padding: "1rem 0",
+                                                fontSize: 12,
+                                                color: "#7d8fa8",
+                                                textTransform: "uppercase",
+                                            }}
+                                        >
+                                            Status
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map((sub) => (
+                                        <tr
+                                            key={sub.id}
+                                            style={{
+                                                borderBottom: "1px solid #f1f5fb",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            <td style={{ padding: "12px 0" }}>
+                                                <div style={{ fontWeight: 600, color: "#0b3f7a" }}>
+                                                    {sub.domainName}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        marginTop: 4,
+                                                    }}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            background: "#f6fbff",
+                                                            color: "#064A8E",
+                                                            padding: "4px 8px",
+                                                            borderRadius: 12,
+                                                            fontSize: 12,
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-calendar3 me-1"></i>
+                                                        {new Date(sub.requestedDate).toLocaleDateString(
+                                                            "en-US",
+                                                            { month: "short", day: "numeric", year: "numeric" }
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                {sub.status.toLowerCase() === 'rejected' && sub.rejectionReason && (
+                                                    <div
+                                                        style={{
+                                                            marginTop: 8,
+                                                            padding: "8px 12px",
+                                                            background: "#fee2e2",
+                                                            borderLeft: "3px solid #ef4444",
+                                                            borderRadius: 4,
+                                                        }}
+                                                    >
+                                                        <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 600, marginBottom: 2 }}>
+                                                            REJECTION REASON
+                                                        </div>
+                                                        <div style={{ fontSize: 13, color: "#dc2626" }}>
+                                                            {sub.rejectionReason}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td style={{ textAlign: "right" }}>
+                                                <StatusBadge status={sub.status} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+}
+
+
+
+import React, { useState, useEffect } from 'react';
+import './DownloadReport.css';
+import { useNavigate, Routes, Route } from 'react-router-dom';
+import folderService from '../../../services/folderService';
+import reportService from '../../../services/reportService';
+import profileService from '../../../services/profileService';
+
+import PDFViewer from '../PDFViewer/PDFViewer';
+
+const DownloadReportComponent = () => {
+    const navigate = useNavigate();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [selectedReport, setSelectedReport] = useState(null);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [showFavorites, setShowFavorites] = useState(false);
+    const [selectedReports, setSelectedReports] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [domains, setDomains] = useState([]);
+    const [statusMsg, setStatusMsg] = useState('');
+
+    // Resolve authenticated user identity strictly from JWT to avoid stale localStorage fields
+    const resolveAuth = () => {
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+            || null;
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return {
+                    email: payload.email || payload.sub || '',
+                    name: payload.name || 'Subscriber',
+                    role: payload.role || 'Subscriber'
+                };
+            } catch (_) {
+                return { email: '', name: 'Subscriber', role: 'Subscriber' };
+            }
+        }
+        return { email: '', name: 'Subscriber', role: 'Subscriber' };
+    };
+    const currentUser = resolveAuth();
+
+    // Fetch user's accessible files on component mount
+    useEffect(() => {
+        fetchUserFiles();
+    }, []);
+
+    const fetchUserFiles = async () => {
+        try {
+            setLoading(true);
+            const files = await folderService.getUserAccessibleFiles(currentUser.email);
+            
+            // Transform files to reports format; display title without prefix before the first underscore and without extension; capture format from extension
+            const transformedReports = files.map((file, index) => {
+                const original = file.name || '';
+                const underscoreIdx = original.indexOf('_');
+                const afterPrefix = underscoreIdx >= 0 ? original.substring(underscoreIdx + 1) : original;
+                const lastDot = afterPrefix.lastIndexOf('.');
+                const display = lastDot > 0 ? afterPrefix.substring(0, lastDot) : afterPrefix;
+                const ext = lastDot > 0 ? afterPrefix.substring(lastDot + 1).toLowerCase() : '';
+                return {
+                    id: index + 1,
+                    title: display,
+                    description: `File from ${file.folder} folder`,
+                    domain: file.folder,
+                    publishedDate: file.modified ? new Date(file.modified).toLocaleDateString() : 'N/A',
+                    version: 'v1.0',
+                    favorite: false,
+                    size: file.size,
+                    fileName: file.name,
+                    folderPath: file.folder,
+                    format: ext || 'unknown'
+                };
+            });
+
+            // Load favorites from backend and mark reports
+            let favs = [];
+            try {
+                favs = await reportService.getFavorites(currentUser.email);
+            } catch (e) {
+                // ignore errors; keep favorites empty
+            }
+            const favoredReports = transformedReports.map(r => ({
+                ...r,
+                favorite: favs.some(f => f.folder === r.folderPath && f.fileName === r.fileName)
+            }));
+
+            setReports(favoredReports);
+            
+            // Extract unique domains (folders)
+            const uniqueDomains = [...new Set(files.map(f => f.folder))].sort();
+            setDomains(uniqueDomains);
+        } catch (error) {
+            console.error('Error fetching user files:', error);
+            setReports([]);
+            setDomains([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredReports = reports.filter(r => {
+        const search = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.domain.toLowerCase().includes(searchQuery.toLowerCase());
+        const dom = filterCategory === 'all' || r.domain === filterCategory;
+        const fav = !showFavorites || r.favorite;
+        return search && dom && fav;
+    });
+
+    const toggleFavorite = async (id) => {
+        const target = reports.find(r => r.id === id);
+        if (!target) return;
+        const userId = currentUser.email;
+
+        // Optimistic update
+        const newFav = !target.favorite;
+        setReports(prev => prev.map(r => r.id === id ? { ...r, favorite: newFav } : r));
+
+        try {
+            if (newFav) {
+                await reportService.addFavorite(userId, target.folderPath, target.fileName);
+            } else {
+                await reportService.removeFavorite(userId, target.folderPath, target.fileName);
+            }
+        } catch (e) {
+            // revert on error
+            setReports(prev => prev.map(r => r.id === id ? { ...r, favorite: !newFav } : r));
+            setStatusMsg('Failed to update favorites.');
+        }
+    };
+
+    const getFavoritesCount = () => reports.filter(r => r.favorite).length;
+
+    const handleDownload = async (report) => {
+        // Download file from backend
+        const downloadUrl = `http://localhost:8080/api/files/download?folder=${encodeURIComponent(report.folderPath)}&fileName=${encodeURIComponent(report.fileName)}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = report.fileName;
+        link.click();
+        try { await profileService.incrementDownloads(currentUser.email, 1); } catch {}
+    };
+
+    const handleSelectReport = (id) => {
+        setSelectedReports(prev => 
+            prev.includes(id) ? prev.filter(reportId => reportId !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedReports.length === filteredReports.length) {
+            setSelectedReports([]);
+        } else {
+            setSelectedReports(filteredReports.map(r => r.id));
+        }
+    };
+
+    const handleDownloadSelected = async () => {
+        try {
+            if (selectedReports.length === 0) return;
+            if (selectedReports.length === 1) {
+                const single = reports.find(r => r.id === selectedReports[0]);
+                if (single) handleDownload(single);
+                setSelectedReports([]);
+                return;
+            }
+
+            const files = selectedReports
+                .map(id => reports.find(r => r.id === id))
+                .filter(Boolean)
+                .map(r => ({ folder: r.folderPath, fileName: r.fileName }));
+
+            setStatusMsg("Preparing ZIP for selected reports...");
+            const blob = await reportService.downloadBatch(files, "selected_reports.zip");
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'selected_reports.zip';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            setStatusMsg("");
+            try { await profileService.incrementDownloads(currentUser.email, files.length); } catch {}
+        } catch (e) {
+            console.error('Batch download error:', e);
+            setStatusMsg('Failed to download selected reports.');
+        } finally {
+            setSelectedReports([]);
+        }
+    };
+
+    const handlePreviewReport = async (report) => {
+        setStatusMsg("");
+        try {
+            const userId = currentUser?.email || "subscriber-demo";
+            const data = await reportService.presignView(
+                report.id.toString(),
+                userId,
+                report.folderPath,
+                report.fileName
+            );
+
+            if (!data) {
+                setStatusMsg("Preview not available.");
+                return;
+            }
+            if (data.message && !data.url) {
+                setStatusMsg(data.message);
+                return;
+            }
+            if (!data.url) {
+                setStatusMsg("No URL received for preview.");
+                return;
+            }
+
+            setSelectedFile({
+                fileName: report.fileName,
+                displayName: report.title,
+                presignedUrl: data.url,
+                reportId: report.id
+            });
+        } catch (error) {
+            console.error("Preview error:", error);
+            setStatusMsg("Failed to preview report. Please try again.");
+        }
+    };
+
+    if(selectedFile) {
+        return (
+            <PDFViewer 
+                displayName={selectedFile.displayName}
+                presignedUrl={selectedFile.presignedUrl}
+                onBack={() => setSelectedFile(null)} 
+            />
+        );
     }
-    return config;
-});
 
-const folderService = {
-    // Get all folders in reports directory
-    listReportFolders: async () => {
-        try {
-            const response = await api.get(`/folders`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching report folders:', error);
-            throw error;
-        }
-    },
+    return (
+        <div className="download-report-container">
+            {/* Header Section */}
+            <div className="hero-section mb-5">
+                <div className="d-flex align-items-center mb-3">
+                    <div className="hero-icon me-3">
+                        <i className="bi bi-file-earmark-arrow-down"></i>
+                    </div>
+                    <div>
+                        <h1 className="hero-title mb-2">Download Reports</h1>
+                        <p className="hero-subtitle mb-0">
+                            Access and download your reports of the respective approved domain
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Search and Filter */}
+            <div className="search-filter-section card shadow-sm mb-4">
+                <div className="card-body">
+                    <div className="row g-3 align-items-center">
+                        <div className="col-md-5">
+                            <div className="search-wrapper">
+                                <i className="bi bi-search search-icon"></i>
+                                <input type="text" className="form-control search-input" placeholder="Search reports..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="col-md-4">
+                            <select className="form-select filter-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                                <option value="all">All Domains</option>
+                                {domains.map(dom => <option key={dom} value={dom}>{dom}</option>)}
+                            </select>
+                        </div>
+                        <div className="col-md-3">
+                            <button
+                                className={`btn w-100 ${showFavorites ? 'btn-warning' : 'btn-outline-warning'}`}
+                                onClick={() => setShowFavorites(!showFavorites)}
+                            >
+                                <i className="bi bi-star-fill me-2"></i>
+                                Favorites
+                                <span className="badge bg-light text-dark ms-2">{getFavoritesCount()}</span>
+                            </button>
+                        </div>
+                    </div>
+                    {selectedReports.length > 0 && (
+                        <div className="row mt-3">
+                            <div className="col-12">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <span className="text-muted">
+                                        <i className="bi bi-check-square me-2"></i>
+                                        {selectedReports.length} report(s) selected
+                                    </span>
+                                    <div className="d-flex gap-2">
+                                        <button className="btn btn-sm btn-outline-secondary" onClick={handleSelectAll}>
+                                            {selectedReports.length === filteredReports.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <button className="btn btn-download" onClick={handleDownloadSelected}>
+                                            <i className="bi bi-download me-2"></i>
+                                            Download Selected
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-    // Get files in a specific folder
-    listFilesInFolder: async (folderName) => {
-        try {
-            const response = await api.get(`/folders/${folderName}/files`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching files in folder:', error);
-            throw error;
-        }
-    },
+            {/* Status Message */}
+            {statusMsg && (
+                <div className="alert alert-info alert-dismissible fade show" role="alert">
+                    {statusMsg}
+                    <button type="button" className="btn-close" onClick={() => setStatusMsg('')}></button>
+                </div>
+            )}
 
-    // Get all files accessible by a user
-    getUserAccessibleFiles: async (email) => {
-        try {
-            const response = await api.get(`/folders/user/${encodeURIComponent(email)}/files`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching user accessible files:', error);
-            throw error;
-        }
-    }
+            {/* Reports */}
+            {loading ? (
+                <div className="text-center py-5">
+                    <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-3 text-muted">Loading your accessible files...</p>
+                </div>
+            ) : filteredReports.length > 0 ? (
+                <div className="row g-4">
+                    {filteredReports.map(r => (
+                        <div key={r.id} className="col-12">
+                            <div className="card report-card shadow-sm">
+                                <div className="card-body">
+                                    <div className="d-flex align-items-start">
+                                        <div className="form-check me-3">
+                                            <input
+                                                className="form-check-input"
+                                                type="checkbox"
+                                                checked={selectedReports.includes(r.id)}
+                                                onChange={() => handleSelectReport(r.id)}
+                                                style={{ width: '20px', height: '20px', marginTop: '5px', cursor: 'pointer' }}
+                                            />
+                                        </div>
+                                        <div className="report-icon me-3">
+                                            <i className="bi bi-file-earmark-text"></i>
+                                        </div>
+                                        <div className="flex-grow-1">
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <h4 className="report-card-title mb-0">{r.title}</h4>
+                                                <button
+                                                    className="btn btn-sm btn-link p-0"
+                                                    onClick={() => toggleFavorite(r.id)}
+                                                    style={{ fontSize: '1.5rem', color: r.favorite ? '#ffc107' : '#ccc' }}
+                                                >
+                                                    <i className={`bi bi-star${r.favorite ? '-fill' : ''}`}></i>
+                                                </button>
+                                            </div>
+                                            <div className="report-meta d-flex flex-wrap gap-3 mb-4">
+                                                {[
+                                                    { icon: 'folder', label: 'Domain', value: r.domain },
+                                                    { icon: 'calendar-event', label: 'Published', value: r.publishedDate },
+                                                    { icon: 'file-pdf', label: 'Format', value: r.format }
+                                                ].map((meta, i) => (
+                                                    <span key={i} className="meta-item">
+                                                        <i className={`bi bi-${meta.icon} me-1`}></i>
+                                                        <strong>{meta.label}:</strong> {meta.value}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <div className="d-flex gap-3 flex-wrap">
+                                                <button className="btn btn-download" onClick={() => handleDownload(r)}>
+                                                    <i className="bi bi-download me-2"></i>Download Report
+                                                </button>
+                                                <button className="btn btn-preview-new" onClick={() => handlePreviewReport(r)}>
+                                                    <i className="bi bi-eye me-2"></i>Preview Report
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="no-results card shadow-sm">
+                    <div className="card-body text-center py-5">
+                        <i className="bi bi-inbox no-results-icon"></i>
+                        <h5 className="mt-3 mb-2">No Reports Found</h5>
+                        <p className="text-muted mb-0">Try adjusting your search or filter criteria</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
-
-export default folderService;
+export default DownloadReportComponent;
