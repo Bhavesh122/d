@@ -1,94 +1,201 @@
-const API_BASE_URL = "http://localhost:8080";
+import React, { useState } from 'react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import axios from 'axios';
 
-const getAuthHeaders = () => {
-  const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'))
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
-    || null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+const LoginPage = ({ role, navigate }) => {
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-const reportService = {
-  /**
-   * Get presigned URL for viewing a report
-   * @param {string} reportId - The report ID
-   * @param {string} userId - The user ID
-   * @param {string} folder - The folder path
-   * @param {string} fileName - The file name
-   */
-  presignView: async (reportId, userId, folder, fileName) => {
+  const roleConfig = {
+    user: { color: '#38D200', title: 'User Login' },
+    admin: { color: '#0473EA', title: 'Admin Login' },
+    ops: { color: '#38D200', title: 'Ops Login' },
+  };
+
+  const config = roleConfig[role] || { color: '#333', title: 'Login' };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    return newErrors;
+  };
+
+  const handleSubmit = async () => {
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+
     try {
-      const res = await fetch(`${API_BASE_URL}/reports/${reportId}/presign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ 
-          userId,
-          folder,
-          fileName
-        })
+      // Clear any stale identity tokens before new login
+      try {
+        sessionStorage.removeItem('token');
+      } catch (_) { /* ignore */ }
+      try {
+        localStorage.removeItem('token');
+      } catch (_) { /* ignore */ }
+
+      const response = await axios.post('http://localhost:8080/api/auth/login', {
+        email: formData.email,
+        password: formData.password
+      }, {
+        headers: { 'Content-Type': 'application/json' }
       });
-      
-      if (!res.ok) {
-        throw new Error("Failed to get preview URL");
+
+      const { token } = response.data;
+      if (token) {
+        // Save token per-tab to support multiple concurrent logins in different tabs
+        try {
+          sessionStorage.setItem('token', token);
+        } catch (_) {
+          // Fallback to localStorage if sessionStorage is unavailable
+          localStorage.setItem('token', token);
+        }
+
+        // Decode token payload to extract role (optional)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const userRole = payload.role;
+        // Persist identity for downstream pages
+        try {
+          const emailFromToken = payload?.email || payload?.sub;
+          if (emailFromToken) {
+            localStorage.setItem('userEmail', emailFromToken);
+          } else if (formData?.email) {
+            localStorage.setItem('userEmail', formData.email);
+          }
+          if (payload?.name) {
+            localStorage.setItem('userName', payload.name);
+          }
+        } catch (_) { /* ignore */ }
+
+        setMessage('Login successful! Reloading...');
+        // Force a full reload to reset SPA state under the new identity
+        setTimeout(() => {
+          window.location.reload();
+        }, 400);
       }
-      
-      return res.json();
-    } catch (error) {
-      console.error("Error in presignView:", error);
-      throw error;
+    } catch (err) {
+      if (err.response?.status === 401 || err.response?.data?.error === 'INVALID_CREDENTIALS') {
+        setMessage('Invalid email or password.');
+      } else {
+        setMessage('Login failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-  },
+  };
 
-  /**
-   * Download multiple files as a ZIP
-   * @param {Array<{folder:string,fileName:string}>} files
-   * @param {string} zipName
-   * @returns {Blob} zip Blob
-   */
-  downloadBatch: async (files, zipName = "reports.zip") => {
-    const res = await fetch(`${API_BASE_URL}/api/files/download/batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ files, zipName })
-    });
-    if (!res.ok) throw new Error("Failed to download selected reports");
-    const blob = await res.blob();
-    return blob;
-  },
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') handleSubmit();
+  };
 
-  /**
-   * Favorites APIs
-   */
-  getFavorites: async (userId) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/favorites?userId=${encodeURIComponent(userId)}`, {
-        headers: { ...getAuthHeaders() }
-      });
-      if (!res.ok) throw new Error("Failed to load favorites");
-      const data = await res.json();
-      return data.favorites || [];
-    } catch (e) {
-      console.error("Error fetching favorites:", e);
-      return [];
-    }
-  },
-  addFavorite: async (userId, folder, fileName) => {
-    const res = await fetch(`${API_BASE_URL}/api/favorites`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ userId, folder, fileName })
-    });
-    if (!res.ok) throw new Error("Failed to add favorite");
-    return res.json();
-  },
-  removeFavorite: async (userId, folder, fileName) => {
-    const res = await fetch(`${API_BASE_URL}/api/favorites`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ userId, folder, fileName })
-    });
-    if (!res.ok) throw new Error("Failed to remove favorite");
-    return res.json();
-  }
+  return (
+    <div className="auth-container">
+      <div className="auth-box">
+        <button className="back-button" onClick={() => navigate('landing')}>
+          ← Back
+        </button>
+
+        <div className="auth-header">
+          <h1 className="auth-title">{config.title}</h1>
+          <p className="auth-subtitle">Enter your credentials to continue</p>
+        </div>
+
+        <div className="auth-form">
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">Email Address</label>
+            <div className="input-wrapper">
+              <Mail size={20} className="input-icon" />
+              <input
+                className={`form-input ${errors.email ? 'error' : ''}`}
+                type="email"
+                id="email"
+                name="email"
+                placeholder="user@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                onKeyPress={handleKeyPress}
+              />
+            </div>
+            {errors.email && <span className="error-text">{errors.email}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">Password</label>
+            <div className="input-wrapper">
+              <Lock size={20} className="input-icon" />
+              <input
+                id="password"
+                name="password"
+                className={`form-input ${errors.password ? 'error' : ''}`}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                onKeyPress={handleKeyPress}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {errors.password && <span className="error-text">{errors.password}</span>}
+          </div>
+
+          <button
+            className="submit-button"
+            style={{ backgroundColor: config.color }}
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : <>Login <ArrowRight size={20} /></>}
+          </button>
+        </div>
+
+        {message && (
+          <p
+            style={{
+              textAlign: 'center',
+              marginTop: '15px',
+              color: message.includes('success') ? 'green' : 'red'
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        <div className="auth-footer">
+          Don't have an account?{' '}
+          <button
+            className="link-button"
+            style={{ color: config.color }}
+            onClick={() => navigate('signup', role)}
+          >
+            Sign up
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-export default reportService;
+export default LoginPage;
