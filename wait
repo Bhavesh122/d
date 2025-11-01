@@ -65,8 +65,14 @@ const LoginPage = ({ role, navigate }) => {
         const userRole = payload.role;
         // Do not persist email/name in localStorage to avoid cross-tab identity bleed.
 
-        setMessage('Login successful! Reloading...');
-        // Force a full reload to reset SPA state under the new identity
+        setMessage('Login successful! Redirecting...');
+        // Navigate to the correct dashboard for this role
+        try {
+          if (userRole === 'ADMIN') navigate('admin-dashboard');
+          else if (userRole === 'OPS') navigate('ops-dashboard');
+          else navigate('subscriber-dashboard');
+        } catch (_) { /* ignore */ }
+        // Then force a full reload shortly after to reset SPA state under the new identity
         setTimeout(() => {
           window.location.reload();
         }, 400);
