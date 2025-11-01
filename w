@@ -1,117 +1,159 @@
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { Mail, Phone, Briefcase, Edit2, Save, X } from 'lucide-react';
+import { getUserSession, updateUserSession, fetchUserData } from '../../../utils/userSession';
+import './SubscriberProfile.css';
 
-// Simple user session management utility
-// This works with your existing backend and token system
+const SubscriberProfile = () => {
+    const [editing, setEditing] = useState(false);
+    const [data, setData] = useState({
+        name: '', email: '', phone: '', domain: '', department: ''
+    });
+    const [temp, setTemp] = useState({ ...data });
+    const [loading, setLoading] = useState(true);
 
-const USER_SESSION_KEY = 'currentUserSession';
-const API_BASE_URL = 'http://localhost:8080/api';
+    // Load user data from session and refresh from backend when component mounts
+    useEffect(() => {
+        loadUserData();
+    }, []);
 
-// Store user session after successful login
-export const setUserSession = (userInfo) => {
-    try {
-        localStorage.setItem(USER_SESSION_KEY, JSON.stringify(userInfo));
-    } catch (error) {
-        console.error('Error storing user session:', error);
-    }
-};
-
-// Get current user session
-export const getUserSession = () => {
-    try {
-        const session = localStorage.getItem(USER_SESSION_KEY);
-        return session ? JSON.parse(session) : null;
-    } catch (error) {
-        console.error('Error retrieving user session:', error);
-        return null;
-    }
-};
-
-// Clear user session on logout
-export const clearUserSession = () => {
-    try {
-        localStorage.removeItem(USER_SESSION_KEY);
-        // Also clear the auth token
-        localStorage.removeItem('token');
-    } catch (error) {
-        console.error('Error clearing user session:', error);
-    }
-};
-
-// Update user session (for profile updates)
-export const updateUserSession = async (updatedInfo) => {
-    try {
-        const currentSession = getUserSession();
-        if (currentSession) {
-            // Update user profile in backend
-            await updateUserProfile(currentSession.email, updatedInfo);
-            
-            // Update local session
-            const updatedSession = { ...currentSession, ...updatedInfo };
-            setUserSession(updatedSession);
-            return updatedSession;
+    const loadUserData = async () => {
+        try {
+            const currentUser = getUserSession();
+            if (currentUser) {
+                // Try to fetch fresh data from backend
+                try {
+                    const freshUserData = await fetchUserData(currentUser.email);
+                    const userData = {
+                        name: freshUserData.name || '',
+                        email: freshUserData.email || '',
+                        phone: freshUserData.phone || '',
+                        domain: freshUserData.domain || '',
+                        department: freshUserData.department || ''
+                    };
+                    setData(userData);
+                    setTemp(userData);
+                } catch (error) {
+                    // If backend fails, use session data as fallback
+                    console.warn('Could not fetch fresh user data, using session data:', error);
+                    const userData = {
+                        name: currentUser.name || '',
+                        email: currentUser.email || '',
+                        phone: currentUser.phone || '',
+                        domain: currentUser.domain || '',
+                        department: currentUser.department || ''
+                    };
+                    setData(userData);
+                    setTemp(userData);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading user data:', error);
+        } finally {
+            setLoading(false);
         }
-        return null;
-    } catch (error) {
-        console.error('Error updating user session:', error);
-        throw error;
+    };
+
+    const fields = [
+        { icon: Mail, label: 'Email', key: 'email', type: 'email' },
+        { icon: Phone, label: 'Phone', key: 'phone', type: 'tel' },
+        { icon: Briefcase, label: 'Domain', key: 'domain', type: 'text' }
+    ];
+
+    const handleSave = async () => {
+        try {
+            // Update the session and backend with new data
+            await updateUserSession(temp);
+            setData({ ...temp });
+            setEditing(false);
+            alert('Profile updated successfully!');
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            alert('Failed to update profile. Please try again.');
+        }
+    };
+
+    const stats = [
+        { label: 'Reports Downloaded', value: '142', color: '#0473BA' },
+        { label: 'Favorite Reports', value: '3', color: '#38D200' }
+    ];
+
+    if (loading) {
+        return (
+            <div className="profile-container">
+                <h1 className="profile-title">My Profile</h1>
+                <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
+            </div>
+        );
     }
+
+    const currentUser = getUserSession();
+    if (!currentUser) {
+        return (
+            <div className="profile-container">
+                <h1 className="profile-title">My Profile</h1>
+                <div style={{ textAlign: 'center', padding: '2rem' }}>Please log in to view your profile.</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="profile-container">
+            <h1 className="profile-title">My Profile</h1>
+            <br></br>
+            <div className="profile-card">
+                <div className="profile-header">
+                    <div className="header-info">
+                        {editing ? (
+                            <input className="name-input" value={temp.name} 
+                                onChange={(e) => setTemp({ ...temp, name: e.target.value })} />
+                        ) : <h2>{data.name}</h2>}
+                        <p>Subscriber</p>
+                    </div>
+                    {!editing ? (
+                        <button className="btn-edit" onClick={() => { setEditing(true); setTemp({ ...data }); }}>
+                            <Edit2 size={16} /> Edit
+                        </button>
+                    ) : (
+                        <div className="edit-btns">
+                            <button className="btn-save" onClick={handleSave}>
+                                <Save size={16} /> Save
+                            </button>
+                            <button className="btn-cancel" onClick={() => { setTemp({ ...data }); setEditing(false); }}>
+                                <X size={16} /> Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="stats">
+                    {stats.map((s, i) => (
+                        <div key={i} className="stat" style={{ borderLeftColor: s.color }}>
+                            <div className="stat-val" style={{ color: s.color }}>{s.value}</div>
+                            <div className="stat-label">{s.label}</div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="info-section">
+                    <h3>Personal Information</h3>
+                    <div className="info-grid">
+                        {fields.map((f, i) => (
+                            <div key={i} className="info-item">
+                                <div className="icon"><f.icon size={20} /></div>
+                                <div>
+                                    <label>{f.label}</label>
+                                    {editing ? (
+                                        <input type={f.type} value={temp[f.key]} 
+                                            onChange={(e) => setTemp({ ...temp, [f.key]: e.target.value })} />
+                                    ) : <p>{data[f.key]}</p>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-// Fetch user data from backend
-export const fetchUserData = async (email) => {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_BASE_URL}/users/profile/${email}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching user data:', error);
-        throw error;
-    }
-};
-
-// Update user profile in backend
-export const updateUserProfile = async (email, profileData) => {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await axios.put(`${API_BASE_URL}/users/profile/${email}`, profileData, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Error updating user profile:', error);
-        throw error;
-    }
-};
-
-// Login user and fetch their profile data
-export const loginUser = async (email, password, role) => {
-    try {
-        // First authenticate with backend
-        const authResponse = await axios.post(`${API_BASE_URL}/auth/login`, {
-            email,
-            password,
-            role
-        });
-
-        const { token, user } = authResponse.data;
-        
-        // Store token
-        localStorage.setItem('token', token);
-        
-        // Store user session
-        setUserSession(user);
-        
-        return user;
-    } catch (error) {
-        console.error('Error logging in user:', error);
-        throw error;
-    }
-};
+export default SubscriberProfile;
